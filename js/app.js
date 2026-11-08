@@ -5,6 +5,7 @@ import { resolveLanguage, setLanguage, translateStatic } from "./i18n.js";
 import { mountFace, updateFace, relayout } from "./faces.js";
 import * as settings from "./settings.js";
 import { THEMES, resolveTheme, onSystemChange } from "./themes.js";
+import * as sound from "./sound.js";
 
 const $ = (id) => document.getElementById(id);
 const stage = $("stage");
@@ -59,6 +60,15 @@ function applyTheme(now = new Date()) {
   const bg = useCustom ? col.bg : THEMES[theme].bg;
   if (themeMeta) themeMeta.setAttribute("content", bg);
   html.style.colorScheme = isLight(bg) ? "light" : "dark";
+
+  // aparência do menu: automático = acompanha o fundo do relógio
+  const ui = s.uiTheme === "light" || s.uiTheme === "dark" ? s.uiTheme : (isLight(bg) ? "light" : "dark");
+  if (html.dataset.ui !== ui) html.dataset.ui = ui;
+}
+
+function nightActive(now = new Date()) {
+  const s = store.get();
+  return s.nightEnabled && isNightTime(now, s.nightStart, s.nightEnd);
 }
 
 function isLight(hex) {
@@ -134,6 +144,42 @@ $("settings-button").addEventListener("click", () => {
   settings.open();
 });
 
+// ---------------- Rotação forçada ----------------
+// Com a rotação do aparelho travada, o app inteiro é girado 90° via CSS.
+let rotation = "none";   // none | cw | ccw
+
+function applyOrientation() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  rootStyle.setProperty("--app-w", w + "px");
+  rootStyle.setProperty("--app-h", h + "px");
+  const s = store.get();
+  const forced = s.orientation === "landscape";
+  // só gira se a janela estiver em pé; se o aparelho já está deitado, não precisa
+  rotation = forced && h > w ? (s.rotateDir === "right" ? "ccw" : "cw") : "none";
+  const html = document.documentElement;
+  html.classList.toggle("rot-cw", rotation === "cw");
+  html.classList.toggle("rot-ccw", rotation === "ccw");
+  $("rotate-button").classList.toggle("active", forced);
+  $("rotate-button").setAttribute("aria-pressed", String(forced));
+}
+
+window.addEventListener("resize", applyOrientation);
+window.addEventListener("orientationchange", () => setTimeout(applyOrientation, 250));
+
+$("rotate-button").addEventListener("click", () => {
+  const next = store.get().orientation === "landscape" ? "auto" : "landscape";
+  store.set({ orientation: next });
+  showUI();
+});
+
+/** Converte o movimento do dedo (tela física) para as direções do app (girado ou não). */
+function toAppDelta(dxScreen, dyScreen) {
+  if (rotation === "cw") return { dx: dyScreen, dy: dxScreen };    // topo do app = lado direito da tela
+  if (rotation === "ccw") return { dx: -dyScreen, dy: -dxScreen }; // topo do app = lado esquerdo da tela
+  return { dx: dxScreen, dy: -dyScreen };
+}
+
 // ---------------- Gestos: toque e swipe vertical ----------------
 let gesture = null;
 
@@ -151,8 +197,7 @@ stage.addEventListener("pointerdown", (e) => {
 
 stage.addEventListener("pointermove", (e) => {
   if (!gesture || e.pointerId !== gesture.id) return;
-  const dy = gesture.startY - e.clientY;     // para cima = positivo
-  const dx = e.clientX - gesture.startX;
+  const { dx, dy } = toAppDelta(e.clientX - gesture.startX, e.clientY - gesture.startY); // dy > 0 = para cima
   if (!gesture.moved && Math.abs(dy) < 10) return;
   if (!gesture.moved && Math.abs(dx) > Math.abs(dy)) return; // horizontal: reservado (abas no futuro)
   gesture.moved = true;
@@ -176,6 +221,9 @@ function endGesture(e) {
 }
 stage.addEventListener("pointerup", endGesture);
 stage.addEventListener("pointercancel", endGesture);
+
+// libera o áudio no primeiro toque (exigência dos navegadores)
+document.addEventListener("pointerdown", () => sound.unlock(), { capture: true });
 
 // evita zoom por gesto de pinça / duplo toque no iOS
 document.addEventListener("gesturestart", (e) => e.preventDefault());
@@ -206,10 +254,12 @@ function tick() {
     applyTheme(now);
     weather.tick();
   }
+  return now;
 }
 
 function loop() {
-  tick();
+  const now = tick();
+  sound.onTick(now, { night: nightActive(now) });
   // agenda para logo após a virada do próximo segundo
   setTimeout(loop, 1000 - (Date.now() % 1000) + 15);
 }
@@ -217,7 +267,8 @@ function loop() {
 // ---------------- Reação a mudanças nas configurações ----------------
 store.subscribe((s, patch) => {
   if ("language" in patch) { applyLanguage(); mountFace(grid, true); }
-  if (["theme", "nightEnabled", "nightStart", "nightEnd", "face", "custom"].some((k) => k in patch)) applyTheme();
+  if (["theme", "nightEnabled", "nightStart", "nightEnd", "face", "custom", "uiTheme"].some((k) => k in patch)) applyTheme();
+  if ("orientation" in patch || "rotateDir" in patch) applyOrientation();
   if ("burnIn" in patch) applyBurnIn();
   if ("brightness" in patch) applyBrightness(s.brightness);
   if ("face" in patch || "custom" in patch) mountFace(grid);
@@ -229,6 +280,7 @@ weather.subscribe(() => { relayout(); tick(); });
 // ---------------- Início ----------------
 applyLanguage();
 applyTheme();
+applyOrientation();
 applyBrightness(store.get().brightness);
 mountFace(grid, true);
 settings.initSettings({ onClose: () => tick(), wakeLockState: () => wakeLockState });

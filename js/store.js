@@ -11,8 +11,11 @@ export const DEFAULT_CUSTOM = {
     hour12: false,
     seconds: true,
     blink: false,           // dois-pontos piscando
-    font: "thin",           // thin | regular | bold | mono | rounded
+    font: "rounded",        // thin | regular | bold | mono | rounded
     analogSeconds: true,    // ponteiro de segundos no analógico
+    analogSmooth: false,    // ponteiro de segundos deslizando (contínuo)
+    analogHourNumbers: false,
+    analogMinuteNumbers: false,
     text: "{HH}:{mm}",
   },
   slots: {
@@ -34,6 +37,17 @@ export const DEFAULT_CUSTOM = {
   },
 };
 
+export const DEFAULT_SOUNDS = {
+  volume: 0.6,
+  muteAtNight: true,      // silencia durante o modo noturno
+  second: false, secondSound: "tic",
+  minute: false, minuteSound: "bip",
+  hour: false, hourSound: "chime", hourRepeat: false,   // repetir conforme a hora (3h = 3 toques)
+  custom: false, customSound: "soft",
+  customMode: "every",    // every = a cada X minutos | at = no minuto X de cada hora
+  customValue: 15,
+};
+
 export const DEFAULTS = {
   language: "auto",        // auto | pt-BR | en-US
   face: "minimal",         // minimal | custom
@@ -49,6 +63,10 @@ export const DEFAULTS = {
   nightEnd: "07:00",
   burnIn: true,
   brightness: 1,           // 0.05 – 1
+  orientation: "auto",     // auto | landscape (forçar horizontal)
+  rotateDir: "left",       // lado da câmera quando forçado: left | right
+  uiTheme: "auto",         // aparência do menu: auto | dark | light
+  sounds: DEFAULT_SOUNDS,
   custom: DEFAULT_CUSTOM,
 };
 
@@ -83,6 +101,7 @@ function hydrate(saved) {
     slots: { ...base.custom.slots, ...(c.slots || {}) },
     colors: { ...base.custom.colors, ...(c.colors || {}) },
   };
+  out.sounds = { ...base.sounds, ...(saved.sounds || {}) };
   return out;
 }
 
@@ -104,6 +123,11 @@ export function setCustom(section, patch) {
   const custom = clone(state.custom);
   custom[section] = { ...custom[section], ...patch };
   set({ custom });
+}
+
+/** Atualiza os sons. Ex.: setSounds({ minute: true }) */
+export function setSounds(patch) {
+  set({ sounds: { ...state.sounds, ...patch } });
 }
 
 /** Troca o componente (ou suas opções) de um slot do Customizado. */

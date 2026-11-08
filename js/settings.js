@@ -5,8 +5,9 @@ import { t, LANGUAGES, getLanguage, formatShortTime, formatDate } from "./i18n.j
 import { THEMES, THEME_ORDER, resolveTheme } from "./themes.js";
 import { SLOT_TYPES, CENTER_TYPES, ZONES, zoneCity } from "./components.js";
 import { TOKENS, expand } from "./tokens.js";
+import { SOUNDS, play as playSound, unlock as unlockSound } from "./sound.js";
 
-export const VERSION = "0.2.0";
+export const VERSION = "0.3.0";
 
 const DATE_FORMATS = ["auto", "dmy", "mdy", "ymd", "short", "long"];
 const SEPARATORS = ["/", "-", "."];
@@ -82,6 +83,10 @@ function render() {
         ${THEME_ORDER.map((th) => swatch(th, s.theme === th)).join("")}
       </div>
       ${s.theme === "system" ? `<div class="row"><span class="row-label"><span class="row-hint">${t("theme.systemHint")}</span></span></div>` : ""}
+      ${switchRow(null, t("rotate.force"), s.orientation === "landscape", t("rotate.hint"), 'data-orientation')}
+      ${s.orientation === "landscape" ? selectRow("rotateDir", t("rotate.side"), [
+        { value: "left", label: t("rotate.left") }, { value: "right", label: t("rotate.right") },
+      ], s.rotateDir) : ""}
     `)}
 
     ${custom ? centerSection(s) + slotsSection(s) + colorsSection(s) : ""}
@@ -91,6 +96,8 @@ function render() {
       ${!custom ? switchRow("showDate", t("info.date"), s.showDate) : ""}
       ${custom || s.showDate ? dateFormatRows(s, lang) : ""}
     `)}
+
+    ${group(t("group.sounds"), soundsSection(s))}
 
     ${group(t("group.temperature"), temperatureSection(s, lang))}
 
@@ -107,6 +114,11 @@ function render() {
         { value: "auto", label: t("general.languageAuto") },
         ...Object.entries(LANGUAGES).map(([k, v]) => ({ value: k, label: v.name })),
       ], s.language)}
+      ${selectRow("uiTheme", t("general.uiTheme"), [
+        { value: "auto", label: t("general.uiAuto") },
+        { value: "dark", label: t("general.uiDark") },
+        { value: "light", label: t("general.uiLight") },
+      ], s.uiTheme)}
       ${switchRow("burnIn", t("general.burnin"), s.burnIn, t("general.burninHint"))}
       <div class="row">
         <span class="row-label">${t("general.wakeLock")}
@@ -163,7 +175,10 @@ function centerSection(s) {
     rows += switchRow(null, t("center.blink"), c.blink, "", 'data-center="blink"');
     rows += selectRow(null, t("center.font"), FONTS.map((f) => ({ value: f, label: t("font." + f) })), c.font, 'data-center="font"');
   } else if (c.type === "analog") {
+    rows += switchRow(null, t("center.analogHourNumbers"), c.analogHourNumbers, "", 'data-center="analogHourNumbers"');
+    rows += switchRow(null, t("center.analogMinuteNumbers"), c.analogMinuteNumbers, "", 'data-center="analogMinuteNumbers"');
     rows += switchRow(null, t("center.analogSeconds"), c.analogSeconds, "", 'data-center="analogSeconds"');
+    if (c.analogSeconds) rows += switchRow(null, t("center.analogSmooth"), c.analogSmooth, t("center.analogSmoothHint"), 'data-center="analogSmooth"');
   } else if (c.type === "text") {
     rows += textEditor("center-text", c.text, 'data-center="text"');
   }
@@ -245,6 +260,49 @@ function colorsSection(s) {
     rows += `<div class="row"><span class="row-label"></span><button type="button" class="btn" data-action="match-main">${t("colors.matchMain")}</button></div>`;
   }
   return group(t("group.colors"), rows);
+}
+
+// ---------- Sons ----------
+function soundSelect(field, value) {
+  return `
+    <span class="sound-pick">
+      <select data-sound="${field}">
+        ${SOUNDS.map((n) => `<option value="${n}" ${n === value ? "selected" : ""}>${esc(t("sound." + n))}</option>`).join("")}
+      </select>
+      <button type="button" class="btn icon-btn" data-action="sound-test" data-value="${field}" aria-label="${esc(t("sounds.test"))}">▶︎</button>
+    </span>`;
+}
+
+function soundsSection(s) {
+  const so = s.sounds;
+  let rows = "";
+  rows += switchRow(null, t("sounds.second"), so.second, "", 'data-sound="second"');
+  if (so.second) rows += `<div class="row sub"><span class="row-label">${t("sounds.sound")}</span>${soundSelect("secondSound", so.secondSound)}</div>`;
+  rows += switchRow(null, t("sounds.minute"), so.minute, "", 'data-sound="minute"');
+  if (so.minute) rows += `<div class="row sub"><span class="row-label">${t("sounds.sound")}</span>${soundSelect("minuteSound", so.minuteSound)}</div>`;
+  rows += switchRow(null, t("sounds.hour"), so.hour, "", 'data-sound="hour"');
+  if (so.hour) {
+    rows += `<div class="row sub"><span class="row-label">${t("sounds.sound")}</span>${soundSelect("hourSound", so.hourSound)}</div>`;
+    rows += switchRow(null, t("sounds.hourRepeat"), so.hourRepeat, t("sounds.hourRepeatHint"), 'data-sound="hourRepeat"').replace('class="row"', 'class="row sub"');
+  }
+  rows += switchRow(null, t("sounds.custom"), so.custom, "", 'data-sound="custom"');
+  if (so.custom) {
+    rows += `<div class="row sub"><span class="row-label">
+        <select data-sound="customMode">
+          <option value="every" ${so.customMode === "every" ? "selected" : ""}>${esc(t("sounds.every"))}</option>
+          <option value="at" ${so.customMode === "at" ? "selected" : ""}>${esc(t("sounds.at"))}</option>
+        </select>
+      </span>
+      <input type="number" class="num-input" data-sound="customValue" min="${so.customMode === "at" ? 0 : 1}" max="${so.customMode === "at" ? 59 : 720}" inputmode="numeric" value="${esc(so.customValue)}">
+      <span class="unit">${so.customMode === "at" ? t("sounds.atUnit") : t("sounds.everyUnit")}</span>
+    </div>`;
+    rows += `<div class="row sub"><span class="row-label">${t("sounds.sound")}</span>${soundSelect("customSound", so.customSound)}</div>`;
+  }
+  rows += `<div class="row"><span class="row-label">${t("sounds.volume")}</span>
+    <input type="range" class="range" data-sound="volume" min="0" max="1" step="0.05" value="${so.volume}"></div>`;
+  rows += switchRow(null, t("sounds.muteAtNight"), so.muteAtNight, "", 'data-sound="muteAtNight"');
+  rows += `<div class="row"><span class="row-label"><span class="row-hint">${t("sounds.hint")}</span></span></div>`;
+  return rows;
 }
 
 // ---------- Temperatura ----------
@@ -357,11 +415,17 @@ function readValue(el) {
 function applyField(el, live) {
   const value = readValue(el);
   const d = el.dataset;
-  const isText = el.type === "text" || el.type === "color";
+  const isText = ["text", "color", "range", "number"].includes(el.type);
   if (live && !isText) return;          // selects/switches: só no "change"
   suppressRender = live;
   try {
-    if ("center" in d) store.setCustom("center", { [d.center]: value });
+    if ("sound" in d) {
+      let v = value;
+      if (d.sound === "volume") v = Number(value);
+      if (d.sound === "customValue") v = Math.max(0, Math.min(720, Math.round(Number(value) || 0)));
+      store.setSounds({ [d.sound]: v });
+    } else if ("orientation" in d) store.set({ orientation: value ? "landscape" : "auto" });
+    else if ("center" in d) store.setCustom("center", { [d.center]: value });
     else if ("color" in d) {
       if (d.color === "enabled" && value) {
         // ao ligar, começa com as cores da paleta atual
@@ -407,8 +471,9 @@ async function onChange(e) {
     return;
   }
 
-  // textos e cores já foram aplicados enquanto a pessoa digitava/escolhia
-  if (el.type === "text" || el.type === "color") return;
+  // textos, cores e controles deslizantes já foram aplicados enquanto a pessoa mexia
+  if (["text", "color", "range"].includes(el.type)) return;
+  if (el.type === "number") { render(); return; }
   applyField(el, false);
 }
 
@@ -418,6 +483,11 @@ function onClick(e) {
   const { action, value } = btn.dataset;
 
   if (action === "theme") store.set({ theme: value });
+  if (action === "sound-test") {
+    unlockSound();
+    const so = store.get().sounds;
+    playSound(so[value], so.volume);
+  }
   if (action === "face") store.set({ face: value });
   if (action === "slot") { selectedSlot = value; render(); }
   if (action === "temp-allow") { asking = false; weather.enable(); render(); }

@@ -68,34 +68,72 @@ export function clockDigital(opts = {}) {
 
 // ---------------- Relógio analógico ----------------
 export function clockAnalog(opts = {}) {
-  const { seconds = true } = opts;
-  let hHand, mHand, sHand;
+  const { seconds = true, smooth = false, hourNumbers = false, minuteNumbers = false } = opts;
+  let hHand, mHand, sHand, raf = 0;
+
+  // Geometria: com números dos minutos, as marcas encolhem para abrir espaço
+  const tickOuter = minuteNumbers ? 76 : 86;      // raio externo das marcas
+  const tickInner = minuteNumbers ? 70 : 72;
+  const tickMajorInner = minuteNumbers ? 66 : 70;
+  const hourR = minuteNumbers ? 54 : 58;          // raio dos números das horas
+
+  const polar = (r, deg) => {
+    const a = (deg - 90) * Math.PI / 180;
+    return [100 + r * Math.cos(a), 100 + r * Math.sin(a)];
+  };
+
+  function setHands(ms) {
+    const d = new Date(ms);
+    const sec = d.getSeconds() + (smooth ? d.getMilliseconds() / 1000 : 0);
+    const m = d.getMinutes() + sec / 60;
+    const h = (d.getHours() % 12) + m / 60;
+    hHand.setAttribute("transform", `rotate(${h * 30} 100 100)`);
+    mHand.setAttribute("transform", `rotate(${m * 6} 100 100)`);
+    if (sHand) sHand.setAttribute("transform", `rotate(${sec * 6} 100 100)`);
+  }
+
+  function frame() {
+    setHands(Date.now());
+    raf = requestAnimationFrame(frame);
+  }
+
   return {
     mount(el) {
       const ticks = Array.from({ length: 12 }, (_, i) => {
         const major = i % 3 === 0;
-        return `<line x1="100" y1="${major ? 14 : 16}" x2="100" y2="${major ? 30 : 24}" stroke-width="${major ? 4 : 2.5}" transform="rotate(${i * 30} 100 100)"/>`;
+        return `<line x1="100" y1="${100 - tickOuter}" x2="100" y2="${100 - (major ? tickMajorInner : tickInner)}" stroke-width="${major ? 4 : 2.5}" transform="rotate(${i * 30} 100 100)"/>`;
       }).join("");
+      const hourNums = hourNumbers ? Array.from({ length: 12 }, (_, i) => {
+        const n = i + 1;
+        const [x, y] = polar(hourR, n * 30);
+        return `<text class="num num-h" x="${x.toFixed(1)}" y="${y.toFixed(1)}">${n}</text>`;
+      }).join("") : "";
+      const minuteNums = minuteNumbers ? Array.from({ length: 12 }, (_, i) => {
+        const n = (i + 1) * 5;
+        const [x, y] = polar(86, n * 6);
+        return `<text class="num num-m" x="${x.toFixed(1)}" y="${y.toFixed(1)}">${String(n).padStart(2, "0")}</text>`;
+      }).join("") : "";
       el.innerHTML = `
         <svg class="clock-analog" viewBox="0 0 200 200" role="img" aria-label="clock">
-          <circle class="face" cx="100" cy="100" r="94"/>
+          <circle class="face" cx="100" cy="100" r="96"/>
           <g class="ticks">${ticks}</g>
-          <line class="hand hand-h" x1="100" y1="112" x2="100" y2="52"/>
-          <line class="hand hand-m" x1="100" y1="116" x2="100" y2="30"/>
-          ${seconds ? '<line class="hand hand-s" x1="100" y1="122" x2="100" y2="22"/>' : ""}
+          ${hourNums}${minuteNums}
+          <line class="hand hand-h" x1="100" y1="112" x2="100" y2="${hourNumbers ? 64 : 52}"/>
+          <line class="hand hand-m" x1="100" y1="116" x2="100" y2="${minuteNumbers ? 34 : 30}"/>
+          ${seconds ? `<line class="hand hand-s" x1="100" y1="122" x2="100" y2="${minuteNumbers ? 28 : 22}"/>` : ""}
           <circle class="hub" cx="100" cy="100" r="5"/>
         </svg>`;
       hHand = el.querySelector(".hand-h");
       mHand = el.querySelector(".hand-m");
       sHand = el.querySelector(".hand-s");
+      if (smooth && seconds) raf = requestAnimationFrame(frame);
     },
     update(now) {
-      const s = now.getSeconds();
-      const m = now.getMinutes() + s / 60;
-      const h = (now.getHours() % 12) + m / 60;
-      hHand.setAttribute("transform", `rotate(${h * 30} 100 100)`);
-      mHand.setAttribute("transform", `rotate(${m * 6} 100 100)`);
-      if (sHand) sHand.setAttribute("transform", `rotate(${s * 6} 100 100)`);
+      if (!raf) setHands(now.getTime() - now.getMilliseconds());
+    },
+    destroy() {
+      if (raf) cancelAnimationFrame(raf);
+      raf = 0;
     },
   };
 }
@@ -285,7 +323,10 @@ export function createSlotComponent(cfg = {}) {
 }
 
 export function createCenterComponent(c = {}) {
-  if (c.type === "analog") return clockAnalog({ seconds: c.analogSeconds });
+  if (c.type === "analog") return clockAnalog({
+    seconds: c.analogSeconds, smooth: c.analogSmooth,
+    hourNumbers: c.analogHourNumbers, minuteNumbers: c.analogMinuteNumbers,
+  });
   if (c.type === "text") return freeText({ text: c.text }, true);
   return clockDigital(c);
 }

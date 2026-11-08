@@ -9,7 +9,7 @@ const COL_SLOTS = ["TL", "L", "BL", "TR", "R", "BR"];
 
 const FACES = {
   minimal: () => ({
-    C: clockDigital({ hour12: false, seconds: true, font: "thin" }),
+    C: clockDigital({ hour12: false, seconds: true, font: "rounded" }),
     B: infoLine(),
   }),
   custom: () => {
@@ -38,6 +38,7 @@ export function mountFace(grid, force = false) {
 
   const factory = FACES[s.face] || FACES.minimal;
   const components = factory();
+  for (const comp of Object.values(mounted)) comp.destroy?.();
   mounted = {};
   grid.querySelectorAll(".slot").forEach((slot) => {
     const id = slot.dataset.slot;

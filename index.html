@@ -19,6 +19,8 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+  <!-- #app pode ser girado 90° via CSS para forçar a horizontal -->
+  <div id="app" class="app">
   <!-- Palco do relógio: grade 3x3 -->
   <main id="stage" class="stage" aria-live="off">
     <div id="shift" class="shift">
@@ -49,6 +51,14 @@
     </svg>
   </button>
 
+  <!-- Botão de girar (canto inferior direito, some junto com o de configurações) -->
+  <button id="rotate-button" class="rotate-button" type="button" data-i18n-aria="rotate.label" aria-label="Girar">
+    <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="7.5" y="3" width="9" height="15" rx="2"/>
+      <path d="M3 13.5a9 9 0 0 0 8 7.4"/><path d="M8.6 18.4l2.4 2.5-2.6 2.1"/>
+    </svg>
+  </button>
+
   <!-- Painel de configurações -->
   <div id="settings" class="settings" hidden>
     <div class="settings-backdrop" data-close></div>
@@ -60,6 +70,8 @@
       <div id="settings-body" class="settings-body"></div>
     </section>
   </div>
+
+  </div><!-- /#app -->
 
   <!-- Aviso caso o app não carregue (ex.: aberto direto do disco, via file://) -->
   <div id="boot-error" class="boot-error" hidden>
