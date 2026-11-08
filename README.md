@@ -4,8 +4,11 @@
 
 Funciona como um app instalado na Tela de Início (PWA): tela cheia, tela sempre ligada, funciona offline.
 
-## Funcionalidades (v0.3.0)
+## Funcionalidades (v0.4.0)
 
+- Três abas: **Relógio**, **Timer** e **Cronômetro** — troque pela barra do topo (aparece com um toque) ou deslizando para o lado
+- **Timer**: ajuste de horas/minutos/segundos (segure para repetir), atalhos (1–60 min), pausa, +1 min e alarme; continua certo em segundo plano
+- **Cronômetro**: voltas (parcial e total), pausa e zerar; o estado fica salvo
 - Mostrador **Minimalista**: `HH:MM:SS` em 24h, pronto para usar
 - Mostrador **Customizado**: grade 3×3 em que cada posição recebe um componente
   - Centro: relógio digital (12/24h, segundos, dois-pontos piscando, 5 fontes), analógico ou texto livre
@@ -14,15 +17,16 @@ Funciona como um app instalado na Tela de Início (PWA): tela cheia, tela sempre
   - Cores personalizadas: fundo, principal e uma cor para horas, minutos e segundos
 - 7 paletas: **Sistema** (padrão; segue o modo claro/escuro do aparelho), Terminal, Âmbar, Neve, Gelo, Noturno e Papel (clara)
 - **Restaurar padrão** nas configurações
-- **Forçar horizontal**: gira o relógio mesmo com a rotação do aparelho travada (botão no canto inferior direito), com escolha do lado da câmera
+- **Forçar horizontal**: gira o app mesmo com a rotação do aparelho travada (botão na barra do topo), com transição e escolha do lado da câmera; os seletores das configurações giram junto
 - **Sons**: a cada segundo (tic-tac), minuto, hora (com opção de repetir conforme a hora) e personalizado (a cada X minutos ou no minuto X), com volume e silêncio no modo noturno
-- Relógio analógico com números das horas e/ou dos minutos e ponteiro de segundos deslizante
+- Relógio analógico com números das horas e/ou dos minutos, marcas de cada minuto e ponteiro de segundos deslizante
 - Fonte arredondada como padrão
 - Menu de configurações claro ou escuro (automático acompanha o relógio)
 - Linha discreta com dia da semana, data e temperatura (opcionais)
 - **Tela sempre ligada** (Wake Lock)
 - **Brilho**: deslize para cima/baixo na tela
-- **Toque** mostra o botão de configurações, que some sozinho em ~3 s
+- **Toque** mostra a barra de controle (girar, abas, configurações), que some sozinha em ~3 s
+- **Procurar atualização** nas configurações (e aviso automático quando sai versão nova)
 - **Modo noturno** automático por horário (cor vermelha escura)
 - **Proteção contra burn-in**: o relógio se move alguns pixels a cada minuto
 - **Temperatura** (opcional) via [Open-Meteo](https://open-meteo.com), com °C/°F e horário da última atualização
@@ -41,7 +45,7 @@ Funciona como um app instalado na Tela de Início (PWA): tela cheia, tela sempre
 1. Abra o endereço no **Safari**.
 2. Toque em **Compartilhar → Adicionar à Tela de Início**.
 3. Abra pelo ícone da Tela de Início (é assim que a tela sempre ligada funciona no iPhone, iOS 18.4+).
-4. Para usar na horizontal com a rotação travada, toque na tela e use o botão de girar (canto inferior direito).
+4. Para usar na horizontal com a rotação travada, toque na tela e use o botão de girar na barra do topo.
 
 ## Instalar no Android
 
@@ -49,7 +53,7 @@ Abra o endereço no Chrome → menu ⋮ → **Instalar app** (ou *Adicionar à t
 
 ## Publicar uma nova versão
 
-Ao alterar arquivos, aumente `CACHE_VERSION` em `sw.js` (ex.: `nada-clock-v0.3.1`) e `VERSION` em `js/settings.js`. Assim os aparelhos baixam os arquivos novos.
+Ao alterar arquivos, aumente `CACHE_VERSION` em `sw.js` (ex.: `nada-clock-v0.4.1`) e `VERSION` em `js/settings.js`. Assim os aparelhos baixam os arquivos novos.
 
 ## Estrutura
 
@@ -64,6 +68,9 @@ js/components.js        componentes (relógios, data, fuso, progresso, lua, cont
 js/tokens.js            placeholders do texto livre
 js/themes.js            paletas e modo Sistema
 js/sound.js             sons sintetizados (Web Audio)
+js/timer.js             abas Timer e Cronômetro
+js/picker.js            seletor próprio (substitui o select nativo)
+js/update.js            atualizações do app (service worker)
 js/settings.js          painel de configurações
 js/weather.js           temperatura (Open-Meteo)
 js/store.js             preferências salvas no aparelho
@@ -84,7 +91,7 @@ python3 -m http.server 8000
 
 - [x] Relógio Minimalista
 - [x] Relógio Customizado (grade 3x3 com componentes e placeholders, paleta clara, Sistema)
-- [ ] Timer e Cronômetro
+- [x] Timer e Cronômetro
 - [ ] Localização sem permissão (aproximada por IP ou escolha da cidade)
 - [ ] Vários presets salvos no Customizado
 - [ ] Nascer/pôr do sol

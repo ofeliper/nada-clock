@@ -6,6 +6,9 @@ import { mountFace, updateFace, relayout } from "./faces.js";
 import * as settings from "./settings.js";
 import { THEMES, resolveTheme, onSystemChange } from "./themes.js";
 import * as sound from "./sound.js";
+import * as timers from "./timer.js";
+import * as update from "./update.js";
+import { initPicker } from "./picker.js";
 
 const $ = (id) => document.getElementById(id);
 const stage = $("stage");
@@ -148,28 +151,97 @@ $("settings-button").addEventListener("click", () => {
 // Com a rotação do aparelho travada, o app inteiro é girado 90° via CSS.
 let rotation = "none";   // none | cw | ccw
 
-function applyOrientation() {
-  const w = window.innerWidth;
-  const h = window.innerHeight;
-  rootStyle.setProperty("--app-w", w + "px");
-  rootStyle.setProperty("--app-h", h + "px");
+const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+let rotating = false;
+
+function targetRotation() {
   const s = store.get();
   const forced = s.orientation === "landscape";
   // só gira se a janela estiver em pé; se o aparelho já está deitado, não precisa
-  rotation = forced && h > w ? (s.rotateDir === "right" ? "ccw" : "cw") : "none";
+  return forced && window.innerHeight > window.innerWidth ? (s.rotateDir === "right" ? "ccw" : "cw") : "none";
+}
+
+function setRotationClasses(next) {
+  rotation = next;
   const html = document.documentElement;
   html.classList.toggle("rot-cw", rotation === "cw");
   html.classList.toggle("rot-ccw", rotation === "ccw");
-  $("rotate-button").classList.toggle("active", forced);
-  $("rotate-button").setAttribute("aria-pressed", String(forced));
 }
 
-window.addEventListener("resize", applyOrientation);
-window.addEventListener("orientationchange", () => setTimeout(applyOrientation, 250));
+/**
+ * Aplica a orientação. Com animate = true, usa a transição "girar e esmaecer":
+ * o conteúdo encolhe e some girando um pouco no sentido do giro, e volta já na nova orientação.
+ */
+function applyOrientation(animate = false) {
+  rootStyle.setProperty("--app-w", window.innerWidth + "px");
+  rootStyle.setProperty("--app-h", window.innerHeight + "px");
+  const forced = store.get().orientation === "landscape";
+  $("rotate-button").classList.toggle("active", forced);
+  $("rotate-button").setAttribute("aria-pressed", String(forced));
+
+  const next = targetRotation();
+  if (next === rotation) return;
+  if (!animate || reduceMotion || rotating || !stage.animate) { setRotationClasses(next); return; }
+
+  // sentido visual do giro: entrar em cw ou sair de ccw = horário (+); o contrário = anti-horário (−)
+  const dir = next === "cw" || rotation === "ccw" ? 1 : -1;
+  rotating = true;
+  const out = stage.animate(
+    [{ opacity: 1, transform: "none" }, { opacity: 0, transform: `scale(0.9) rotate(${dir * 10}deg)` }],
+    { duration: 170, easing: "ease-in", fill: "forwards" }
+  );
+  out.onfinish = () => {
+    setRotationClasses(next);
+    const inn = stage.animate(
+      [{ opacity: 0, transform: `scale(0.9) rotate(${-dir * 10}deg)` }, { opacity: 1, transform: "none" }],
+      { duration: 260, easing: "cubic-bezier(.2,.8,.2,1)" }
+    );
+    out.cancel();
+    inn.onfinish = inn.oncancel = () => { rotating = false; };
+  };
+}
+
+window.addEventListener("resize", () => applyOrientation(false));
+window.addEventListener("orientationchange", () => setTimeout(() => applyOrientation(false), 250));
 
 $("rotate-button").addEventListener("click", () => {
   const next = store.get().orientation === "landscape" ? "auto" : "landscape";
+  pendingRotateAnim = true;
   store.set({ orientation: next });
+  showUI();
+});
+let pendingRotateAnim = false;
+
+// ---------------- Abas ----------------
+const TABS = ["clock", "timer", "stopwatch"];
+
+function applyTab() {
+  const tab = store.get().tab;
+  document.querySelectorAll(".view").forEach((v) => { v.hidden = v.dataset.view !== tab; });
+  document.querySelectorAll(".tab").forEach((b) => {
+    const on = b.dataset.tab === tab;
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-selected", String(on));
+  });
+  timers.setActiveTab(tab);
+  if (tab === "clock") { relayout(); tick(); }
+}
+
+function updateTabDots() {
+  document.querySelector('.tab[data-tab="timer"]').classList.toggle("running", timers.timerActive());
+  document.querySelector('.tab[data-tab="stopwatch"]').classList.toggle("running", timers.stopwatchActive());
+}
+
+function switchTab(delta) {
+  const i = TABS.indexOf(store.get().tab);
+  const next = TABS[(i + delta + TABS.length) % TABS.length];
+  store.set({ tab: next });
+}
+
+document.querySelector(".tabs").addEventListener("click", (e) => {
+  const b = e.target.closest(".tab");
+  if (!b) return;
+  store.set({ tab: b.dataset.tab });
   showUI();
 });
 
@@ -184,6 +256,7 @@ function toAppDelta(dxScreen, dyScreen) {
 let gesture = null;
 
 stage.addEventListener("pointerdown", (e) => {
+  if (e.target.closest("button, input, select, a, label, .sw-laps")) return; // botões e lista de voltas
   gesture = {
     id: e.pointerId,
     startY: e.clientY,
@@ -198,8 +271,11 @@ stage.addEventListener("pointerdown", (e) => {
 stage.addEventListener("pointermove", (e) => {
   if (!gesture || e.pointerId !== gesture.id) return;
   const { dx, dy } = toAppDelta(e.clientX - gesture.startX, e.clientY - gesture.startY); // dy > 0 = para cima
+  gesture.dx = dx;
+  gesture.dy = dy;
+  if (gesture.horizontal) return;
+  if (!gesture.moved && Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy)) { gesture.horizontal = true; return; } // troca de aba
   if (!gesture.moved && Math.abs(dy) < 10) return;
-  if (!gesture.moved && Math.abs(dx) > Math.abs(dy)) return; // horizontal: reservado (abas no futuro)
   gesture.moved = true;
   const range = stage.clientHeight * 0.75;   // ~3/4 da tela vai de 5% a 100%
   const v = clamp(gesture.startB + dy / range, MIN_BRIGHTNESS, 1);
@@ -214,6 +290,8 @@ function endGesture(e) {
   gesture = null;
   if (g.moved) {
     if (g.value != null) store.set({ brightness: g.value });
+  } else if (g.horizontal) {
+    if (e.type === "pointerup" && Math.abs(g.dx) > 60) switchTab(g.dx < 0 ? 1 : -1);
   } else if (e.type === "pointerup" && performance.now() - g.t0 < 500) {
     toggleUI();
   }
@@ -259,6 +337,7 @@ function tick() {
 
 function loop() {
   const now = tick();
+  timers.tick(now.getTime());
   sound.onTick(now, { night: nightActive(now) });
   // agenda para logo após a virada do próximo segundo
   setTimeout(loop, 1000 - (Date.now() % 1000) + 15);
@@ -266,9 +345,10 @@ function loop() {
 
 // ---------------- Reação a mudanças nas configurações ----------------
 store.subscribe((s, patch) => {
-  if ("language" in patch) { applyLanguage(); mountFace(grid, true); }
+  if ("language" in patch) { applyLanguage(); mountFace(grid, true); timers.relabel(); }
+  if ("tab" in patch) applyTab();
   if (["theme", "nightEnabled", "nightStart", "nightEnd", "face", "custom", "uiTheme"].some((k) => k in patch)) applyTheme();
-  if ("orientation" in patch || "rotateDir" in patch) applyOrientation();
+  if ("orientation" in patch || "rotateDir" in patch) { applyOrientation(pendingRotateAnim || "orientation" in patch); pendingRotateAnim = false; }
   if ("burnIn" in patch) applyBurnIn();
   if ("brightness" in patch) applyBrightness(s.brightness);
   if ("face" in patch || "custom" in patch) mountFace(grid);
@@ -283,6 +363,15 @@ applyTheme();
 applyOrientation();
 applyBrightness(store.get().brightness);
 mountFace(grid, true);
+initPicker();
+timers.init({
+  changed: updateTabDots,
+  finished: () => { if (store.get().tab !== "timer") store.set({ tab: "timer" }); },
+});
+timers.mountTimer($("timer-view"));
+timers.mountStopwatch($("stopwatch-view"));
+applyTab();
+updateTabDots();
 settings.initSettings({ onClose: () => tick(), wakeLockState: () => wakeLockState });
 weather.init();
 applyBurnIn();
@@ -293,7 +382,5 @@ requestWakeLock();
 showUI();
 window.__nadaReady = true;
 
-// Service worker: funciona offline e permite instalar na Tela de Início
-if ("serviceWorker" in navigator && location.protocol === "https:") {
-  navigator.serviceWorker.register("./sw.js").catch(() => { /* segue sem offline */ });
-}
+// Service worker: offline, instalação na Tela de Início e atualizações
+update.init();

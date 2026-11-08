@@ -16,7 +16,7 @@ const FACES = {
     const c = store.get().custom;
     const out = { C: createCenterComponent(c.center) };
     for (const [slot, cfg] of Object.entries(c.slots)) {
-      if (slot === "TR" || slot === "C") continue; // TR: botão de configurações
+      if (slot === "C") continue;
       const comp = createSlotComponent(cfg);
       if (comp) out[slot] = comp;
     }

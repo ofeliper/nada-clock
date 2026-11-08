@@ -6,8 +6,11 @@ import { THEMES, THEME_ORDER, resolveTheme } from "./themes.js";
 import { SLOT_TYPES, CENTER_TYPES, ZONES, zoneCity } from "./components.js";
 import { TOKENS, expand } from "./tokens.js";
 import { SOUNDS, play as playSound, unlock as unlockSound } from "./sound.js";
+import { enhanceSelects, handleSelectTap } from "./picker.js";
+import * as update from "./update.js";
+import * as timers from "./timer.js";
 
-export const VERSION = "0.3.0";
+export const VERSION = "0.4.0";
 
 const DATE_FORMATS = ["auto", "dmy", "mdy", "ymd", "short", "long"];
 const SEPARATORS = ["/", "-", "."];
@@ -20,6 +23,7 @@ let selectedSlot = "B";       // posição selecionada no editor do Customizado
 let resetArmed = false;       // 1º toque em "Restaurar padrão"
 let resetTimer;
 let suppressRender = false;   // evita redesenhar o painel enquanto a pessoa digita
+let updateStatus = "";        // "", checking, latest, updating, unsupported, error
 
 export function initSettings({ onClose, wakeLockState }) {
   root = document.getElementById("settings");
@@ -36,6 +40,8 @@ export function initSettings({ onClose, wakeLockState }) {
 
   body.addEventListener("change", onChange);
   body.addEventListener("input", onInput);
+  // selects: abrem o seletor próprio (que gira junto com o app)
+  body.addEventListener("click", (e) => { if (handleSelectTap(e)) e.stopPropagation(); }, true);
   body.addEventListener("click", onClick);
   // os botões de placeholder não tiram o foco do campo de texto (mantém o cursor)
   body.addEventListener("mousedown", (e) => { if (e.target.closest(".chip")) e.preventDefault(); });
@@ -51,6 +57,7 @@ export function isOpen() {
 export function open() {
   asking = false;
   resetArmed = false;
+  updateStatus = "";
   root.hidden = false;
   render();
 }
@@ -104,8 +111,8 @@ function render() {
     ${group(t("group.night"), `
       ${switchRow("nightEnabled", t("night.enabled"), s.nightEnabled, t("night.hint"))}
       ${s.nightEnabled ? `
-        <div class="row"><span class="row-label">${t("night.start")}</span><input type="time" data-key="nightStart" value="${s.nightStart}"></div>
-        <div class="row"><span class="row-label">${t("night.end")}</span><input type="time" data-key="nightEnd" value="${s.nightEnd}"></div>
+        ${timeRow("nightStart", t("night.start"), s.nightStart)}
+        ${timeRow("nightEnd", t("night.end"), s.nightEnd)}
       ` : ""}
     `)}
 
@@ -126,6 +133,12 @@ function render() {
         </span>
       </div>
       <div class="row">
+        <span class="row-label">${t("update.version", { v: VERSION })}
+          ${updateHint()}
+        </span>
+        <button type="button" class="btn" data-action="update-check" ${updateStatus === "checking" || updateStatus === "updating" ? "disabled" : ""}>${t("update.check")}</button>
+      </div>
+      <div class="row">
         <span class="row-label">
           <button type="button" class="btn danger ${resetArmed ? "confirm" : ""}" data-action="reset">${resetArmed ? t("general.resetConfirm") : t("general.reset")}</button>
           <span class="row-hint">${t("general.resetHint")}</span>
@@ -139,6 +152,7 @@ function render() {
       ${t("about.gestures")}
     </div>
   `;
+  enhanceSelects(body);
   body.scrollTop = scroll;
 }
 
@@ -177,6 +191,7 @@ function centerSection(s) {
   } else if (c.type === "analog") {
     rows += switchRow(null, t("center.analogHourNumbers"), c.analogHourNumbers, "", 'data-center="analogHourNumbers"');
     rows += switchRow(null, t("center.analogMinuteNumbers"), c.analogMinuteNumbers, "", 'data-center="analogMinuteNumbers"');
+    rows += switchRow(null, t("center.analogMinuteTicks"), c.analogMinuteTicks, "", 'data-center="analogMinuteTicks"');
     rows += switchRow(null, t("center.analogSeconds"), c.analogSeconds, "", 'data-center="analogSeconds"');
     if (c.analogSeconds) rows += switchRow(null, t("center.analogSmooth"), c.analogSmooth, t("center.analogSmoothHint"), 'data-center="analogSmooth"');
   } else if (c.type === "text") {
@@ -187,19 +202,18 @@ function centerSection(s) {
 
 // ---------- Customizado: posições ----------
 function slotLabel(id, s) {
-  if (id === "TR") return "⚙️";
   if (id === "C") return t("comp." + (s.custom.center.type === "text" ? "text" : s.custom.center.type));
   const type = s.custom.slots[id]?.type || "empty";
   return type === "empty" ? "—" : t("comp." + type);
 }
 
 function slotsSection(s) {
-  if (selectedSlot === "C" || selectedSlot === "TR") selectedSlot = "B";
+  if (selectedSlot === "C") selectedSlot = "B";
   const grid = `
     <div class="slot-grid" role="group" aria-label="${t("group.slots")}">
       ${GRID.map((id) => {
         const filled = id === "C" || (s.custom.slots[id] && s.custom.slots[id].type !== "empty");
-        const disabled = id === "TR" || id === "C";
+        const disabled = id === "C";
         return `<button type="button" data-action="slot" data-value="${id}" ${disabled ? "disabled" : ""}
           class="${filled ? "filled" : ""}" aria-pressed="${id === selectedSlot}">${slotLabel(id, s)}</button>`;
       }).join("")}
@@ -298,6 +312,7 @@ function soundsSection(s) {
     </div>`;
     rows += `<div class="row sub"><span class="row-label">${t("sounds.sound")}</span>${soundSelect("customSound", so.customSound)}</div>`;
   }
+  rows += `<div class="row"><span class="row-label">${t("sounds.timer")}</span>${soundSelect("timerSound", so.timerSound)}</div>`;
   rows += `<div class="row"><span class="row-label">${t("sounds.volume")}</span>
     <input type="range" class="range" data-sound="volume" min="0" max="1" step="0.05" value="${so.volume}"></div>`;
   rows += switchRow(null, t("sounds.muteAtNight"), so.muteAtNight, "", 'data-sound="muteAtNight"');
@@ -377,12 +392,39 @@ function switchRow(key, label, checked, hint, attr = "") {
 
 function selectRow(key, label, options, value, attr = "") {
   return `
-    <label class="row">
+    <div class="row">
       <span class="row-label">${label}</span>
       <select ${key ? `data-key="${key}"` : ""} ${attr}>
         ${options.map((o) => `<option value="${esc(o.value)}" ${String(o.value) === String(value) ? "selected" : ""}>${esc(o.label)}</option>`).join("")}
       </select>
-    </label>`;
+    </div>`;
+}
+
+/** Horário como dois seletores (hora e minuto), para usar o seletor próprio. */
+function timeRow(key, label, value) {
+  const [h, m] = String(value || "00:00").split(":").map((x) => parseInt(x, 10) || 0);
+  const hours = Array.from({ length: 24 }, (_, i) => i);
+  const mins = Array.from({ length: 12 }, (_, i) => i * 5);
+  if (!mins.includes(m)) { mins.push(m); mins.sort((a, b) => a - b); }
+  const p2 = (n) => String(n).padStart(2, "0");
+  const opt = (n, cur) => `<option value="${n}" ${n === cur ? "selected" : ""}>${p2(n)}</option>`;
+  return `
+    <div class="row">
+      <span class="row-label">${label}</span>
+      <span class="time-pick">
+        <select data-time-key="${key}" data-part="h">${hours.map((n) => opt(n, h)).join("")}</select>
+        <span>:</span>
+        <select data-time-key="${key}" data-part="m">${mins.map((n) => opt(n, m)).join("")}</select>
+      </span>
+    </div>`;
+}
+
+function updateHint() {
+  if (!updateStatus) return "";
+  const warn = updateStatus === "error" || updateStatus === "unsupported";
+  const force = updateStatus === "latest" || updateStatus === "error"
+    ? ` <button type="button" class="link-btn" data-action="update-force">${t("update.force")}</button>` : "";
+  return `<span class="row-hint ${warn ? "warn" : ""}">${t("update." + updateStatus)}${force}</span>`;
 }
 
 function inputRow(label, value, placeholder, attr) {
@@ -424,6 +466,11 @@ function applyField(el, live) {
       if (d.sound === "volume") v = Number(value);
       if (d.sound === "customValue") v = Math.max(0, Math.min(720, Math.round(Number(value) || 0)));
       store.setSounds({ [d.sound]: v });
+    } else if ("timeKey" in d) {
+      const p2 = (n) => String(n).padStart(2, "0");
+      const [h, m] = String(store.get()[d.timeKey] || "00:00").split(":");
+      const next = d.part === "h" ? `${p2(value)}:${m}` : `${h}:${p2(value)}`;
+      store.set({ [d.timeKey]: next });
     } else if ("orientation" in d) store.set({ orientation: value ? "landscape" : "auto" });
     else if ("center" in d) store.setCustom("center", { [d.center]: value });
     else if ("color" in d) {
@@ -483,6 +530,12 @@ function onClick(e) {
   const { action, value } = btn.dataset;
 
   if (action === "theme") store.set({ theme: value });
+  if (action === "update-check") {
+    updateStatus = "checking";
+    render();
+    update.checkNow().then((r) => { updateStatus = r; refresh(); });
+  }
+  if (action === "update-force") update.forceReload();
   if (action === "sound-test") {
     unlockSound();
     const so = store.get().sounds;
@@ -522,6 +575,7 @@ function onClick(e) {
       clearTimeout(resetTimer);
       selectedSlot = "B";
       weather.disable();
+      timers.reset();
       store.reset();
     }
   }

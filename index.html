@@ -21,10 +21,11 @@
 <body>
   <!-- #app pode ser girado 90° via CSS para forçar a horizontal -->
   <div id="app" class="app">
-  <!-- Palco do relógio: grade 3x3 -->
+  <!-- Palco: uma "vista" por aba -->
   <main id="stage" class="stage" aria-live="off">
     <div id="shift" class="shift">
-      <div id="grid" class="grid">
+      <!-- Aba Relógio: grade 3x3 -->
+      <div id="grid" class="grid view" data-view="clock">
         <div class="slot" data-slot="TL"></div>
         <div class="slot" data-slot="T"></div>
         <div class="slot" data-slot="TR"></div>
@@ -35,6 +36,10 @@
         <div class="slot" data-slot="B"></div>
         <div class="slot" data-slot="BR"></div>
       </div>
+      <!-- Aba Timer -->
+      <div id="timer-view" class="tview view" data-view="timer" hidden></div>
+      <!-- Aba Cronômetro -->
+      <div id="stopwatch-view" class="tview view" data-view="stopwatch" hidden></div>
     </div>
   </main>
 
@@ -44,20 +49,37 @@
     <span id="brightness-value">100%</span>
   </div>
 
-  <!-- Botão de configurações (canto superior direito, some sozinho) -->
-  <button id="settings-button" class="settings-button" type="button" aria-label="Configurações">
-    <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
-      <path fill="currentColor" d="M19.14 12.94a7.07 7.07 0 0 0 .05-.94 7.07 7.07 0 0 0-.05-.94l2.03-1.58a.49.49 0 0 0 .12-.62l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.03 7.03 0 0 0-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84a.48.48 0 0 0-.48.41l-.36 2.54a7.36 7.36 0 0 0-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.48.48 0 0 0 .12.62l2.03 1.58a7.24 7.24 0 0 0 0 1.88l-2.03 1.58a.49.49 0 0 0-.12.62l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.04.7 1.62.94l.36 2.54c.05.24.25.41.48.41h3.84c.24 0 .44-.17.48-.41l.36-2.54a7.36 7.36 0 0 0 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.62l-2.03-1.58ZM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2Z"/>
-    </svg>
-  </button>
+  <!-- Barra de controle: aparece com um toque e some sozinha (não ocupa a grade) -->
+  <nav id="topbar" class="topbar" aria-label="NADA Clock">
+    <button id="rotate-button" class="bar-btn" type="button" data-i18n-aria="rotate.label" aria-label="Girar">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="7.5" y="3" width="9" height="15" rx="2"/>
+        <path d="M3 13.5a9 9 0 0 0 8 7.4"/><path d="M8.6 18.4l2.4 2.5-2.6 2.1"/>
+      </svg>
+    </button>
+    <div class="tabs" role="tablist">
+      <button type="button" class="tab" role="tab" data-tab="clock"><span data-i18n="tab.clock">Relógio</span></button>
+      <button type="button" class="tab" role="tab" data-tab="timer"><span data-i18n="tab.timer">Timer</span><i class="tab-dot"></i></button>
+      <button type="button" class="tab" role="tab" data-tab="stopwatch"><span data-i18n="tab.stopwatch">Cronômetro</span><i class="tab-dot"></i></button>
+    </div>
+    <button id="settings-button" class="bar-btn" type="button" data-i18n-aria="settings.title" aria-label="Configurações">
+      <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+        <path fill="currentColor" d="M19.14 12.94a7.07 7.07 0 0 0 .05-.94 7.07 7.07 0 0 0-.05-.94l2.03-1.58a.49.49 0 0 0 .12-.62l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.03 7.03 0 0 0-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84a.48.48 0 0 0-.48.41l-.36 2.54a7.36 7.36 0 0 0-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.48.48 0 0 0 .12.62l2.03 1.58a7.24 7.24 0 0 0 0 1.88l-2.03 1.58a.49.49 0 0 0-.12.62l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.04.7 1.62.94l.36 2.54c.05.24.25.41.48.41h3.84c.24 0 .44-.17.48-.41l.36-2.54a7.36 7.36 0 0 0 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.62l-2.03-1.58ZM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2Z"/>
+      </svg>
+    </button>
+  </nav>
 
-  <!-- Botão de girar (canto inferior direito, some junto com o de configurações) -->
-  <button id="rotate-button" class="rotate-button" type="button" data-i18n-aria="rotate.label" aria-label="Girar">
-    <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-      <rect x="7.5" y="3" width="9" height="15" rx="2"/>
-      <path d="M3 13.5a9 9 0 0 0 8 7.4"/><path d="M8.6 18.4l2.4 2.5-2.6 2.1"/>
-    </svg>
-  </button>
+  <!-- Aviso de nova versão -->
+  <button id="update-toast" class="toast" type="button" hidden></button>
+
+  <!-- Seletor próprio (substitui a "roleta" nativa, que não gira com o app) -->
+  <div id="picker" class="picker" hidden>
+    <div class="picker-backdrop" data-picker-close></div>
+    <div class="picker-card" role="listbox">
+      <div class="picker-title"></div>
+      <div class="picker-list"></div>
+    </div>
+  </div>
 
   <!-- Painel de configurações -->
   <div id="settings" class="settings" hidden>

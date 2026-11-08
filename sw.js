@@ -1,6 +1,6 @@
 // Service worker do NADA Clock: guarda o app para funcionar offline.
 // Ao publicar uma nova versão, aumente CACHE_VERSION para os aparelhos baixarem os arquivos novos.
-const CACHE_VERSION = "nada-clock-v0.3.0";
+const CACHE_VERSION = "nada-clock-v0.4.0";
 
 const ASSETS = [
   "./",
@@ -19,13 +19,17 @@ const ASSETS = [
   "./js/tokens.js",
   "./js/components.js",
   "./js/sound.js",
+  "./js/timer.js",
+  "./js/picker.js",
+  "./js/update.js",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/apple-touch-icon.png",
 ];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE_VERSION).then((c) => c.addAll(ASSETS)));
+  // cache: "reload" ignora o cache HTTP do navegador e busca os arquivos novos no servidor
+  event.waitUntil(caches.open(CACHE_VERSION).then((c) => c.addAll(ASSETS.map((u) => new Request(u, { cache: "reload" })))));
   self.skipWaiting();
 });
 

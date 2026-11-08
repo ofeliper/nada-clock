@@ -68,7 +68,7 @@ export function clockDigital(opts = {}) {
 
 // ---------------- Relógio analógico ----------------
 export function clockAnalog(opts = {}) {
-  const { seconds = true, smooth = false, hourNumbers = false, minuteNumbers = false } = opts;
+  const { seconds = true, smooth = false, hourNumbers = false, minuteNumbers = false, minuteTicks = false } = opts;
   let hHand, mHand, sHand, raf = 0;
 
   // Geometria: com números dos minutos, as marcas encolhem para abrir espaço
@@ -103,6 +103,8 @@ export function clockAnalog(opts = {}) {
         const major = i % 3 === 0;
         return `<line x1="100" y1="${100 - tickOuter}" x2="100" y2="${100 - (major ? tickMajorInner : tickInner)}" stroke-width="${major ? 4 : 2.5}" transform="rotate(${i * 30} 100 100)"/>`;
       }).join("");
+      const minorTicks = minuteTicks ? Array.from({ length: 60 }, (_, i) => i % 5 === 0 ? "" :
+        `<line x1="100" y1="${100 - tickOuter}" x2="100" y2="${100 - tickOuter + 4}" stroke-width="1.2" transform="rotate(${i * 6} 100 100)"/>`).join("") : "";
       const hourNums = hourNumbers ? Array.from({ length: 12 }, (_, i) => {
         const n = i + 1;
         const [x, y] = polar(hourR, n * 30);
@@ -117,6 +119,7 @@ export function clockAnalog(opts = {}) {
         <svg class="clock-analog" viewBox="0 0 200 200" role="img" aria-label="clock">
           <circle class="face" cx="100" cy="100" r="96"/>
           <g class="ticks">${ticks}</g>
+          ${minorTicks ? `<g class="ticks minor">${minorTicks}</g>` : ""}
           ${hourNums}${minuteNums}
           <line class="hand hand-h" x1="100" y1="112" x2="100" y2="${hourNumbers ? 64 : 52}"/>
           <line class="hand hand-m" x1="100" y1="116" x2="100" y2="${minuteNumbers ? 34 : 30}"/>
@@ -325,7 +328,7 @@ export function createSlotComponent(cfg = {}) {
 export function createCenterComponent(c = {}) {
   if (c.type === "analog") return clockAnalog({
     seconds: c.analogSeconds, smooth: c.analogSmooth,
-    hourNumbers: c.analogHourNumbers, minuteNumbers: c.analogMinuteNumbers,
+    hourNumbers: c.analogHourNumbers, minuteNumbers: c.analogMinuteNumbers, minuteTicks: c.analogMinuteTicks,
   });
   if (c.type === "text") return freeText({ text: c.text }, true);
   return clockDigital(c);

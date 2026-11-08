@@ -2,8 +2,8 @@
 const KEY = "nada-clock:settings:v1";
 const WEATHER_KEY = "nada-clock:weather:v1";
 
-/** Slots editáveis no Customizado. TR fica reservado para o botão de configurações. */
-export const EDITABLE_SLOTS = ["TL", "T", "L", "C", "R", "BL", "B", "BR"];
+/** Slots editáveis no Customizado (os controles agora ficam na barra do topo). */
+export const EDITABLE_SLOTS = ["TL", "T", "TR", "L", "C", "R", "BL", "B", "BR"];
 
 export const DEFAULT_CUSTOM = {
   center: {
@@ -16,11 +16,13 @@ export const DEFAULT_CUSTOM = {
     analogSmooth: false,    // ponteiro de segundos deslizando (contínuo)
     analogHourNumbers: false,
     analogMinuteNumbers: false,
+    analogMinuteTicks: false, // marcas de cada minuto
     text: "{HH}:{mm}",
   },
   slots: {
     TL: { type: "empty" },
     T:  { type: "empty" },
+    TR: { type: "empty" },
     L:  { type: "empty" },
     R:  { type: "empty" },
     BL: { type: "empty" },
@@ -46,6 +48,7 @@ export const DEFAULT_SOUNDS = {
   custom: false, customSound: "soft",
   customMode: "every",    // every = a cada X minutos | at = no minuto X de cada hora
   customValue: 15,
+  timerSound: "chime",    // alarme do timer
 };
 
 export const DEFAULTS = {
@@ -63,6 +66,7 @@ export const DEFAULTS = {
   nightEnd: "07:00",
   burnIn: true,
   brightness: 1,           // 0.05 – 1
+  tab: "clock",            // clock | timer | stopwatch
   orientation: "auto",     // auto | landscape (forçar horizontal)
   rotateDir: "left",       // lado da câmera quando forçado: left | right
   uiTheme: "auto",         // aparência do menu: auto | dark | light
