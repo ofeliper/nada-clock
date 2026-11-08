@@ -4,7 +4,7 @@
 
 Funciona como um app instalado na Tela de Início (PWA): tela cheia, tela sempre ligada, funciona offline.
 
-## Funcionalidades (v0.7.1)
+## Funcionalidades (v0.7.2)
 
 - Quatro abas: **Relógio**, **Timer**, **Cronômetro** e **Pomodoro** — troque pela barra do topo (aparece com um toque) ou deslizando para o lado
 - **Timer**: vários ao mesmo tempo, com nome (ex.: "macarrão", "forno")

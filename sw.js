@@ -1,6 +1,6 @@
 // Service worker do NADA Clock: guarda o app para funcionar offline.
 // Ao publicar uma nova versão, aumente CACHE_VERSION para os aparelhos baixarem os arquivos novos.
-const CACHE_VERSION = "nada-clock-v0.7.1";
+const CACHE_VERSION = "nada-clock-v0.7.2";
 
 const ASSETS = [
   "./",
@@ -31,6 +31,32 @@ const ASSETS = [
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/apple-touch-icon.png",
+  // páginas Sobre / About / Acerca (também offline)
+  "./sobre/",
+  "./about/",
+  "./acerca/",
+  "./css/about.css",
+  "./assets/pt/clock-analog.webp",
+  "./assets/pt/clock-digital.webp",
+  "./assets/pt/clock-flip.webp",
+  "./assets/pt/clock-led.webp",
+  "./assets/pt/custom.webp",
+  "./assets/pt/pomodoro.webp",
+  "./assets/pt/timers.webp",
+  "./assets/en/clock-analog.webp",
+  "./assets/en/clock-digital.webp",
+  "./assets/en/clock-flip.webp",
+  "./assets/en/clock-led.webp",
+  "./assets/en/custom.webp",
+  "./assets/en/pomodoro.webp",
+  "./assets/en/timers.webp",
+  "./assets/es/clock-analog.webp",
+  "./assets/es/clock-digital.webp",
+  "./assets/es/clock-flip.webp",
+  "./assets/es/clock-led.webp",
+  "./assets/es/custom.webp",
+  "./assets/es/pomodoro.webp",
+  "./assets/es/timers.webp",
 ];
 
 self.addEventListener("install", (event) => {
