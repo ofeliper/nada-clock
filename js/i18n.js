@@ -2,10 +2,12 @@
 // Datas, meses e dias da semana vêm do próprio navegador (Intl), sem tradução manual.
 import ptBR from "./i18n/pt-BR.js";
 import enUS from "./i18n/en-US.js";
+import es from "./i18n/es.js";
 
 export const LANGUAGES = {
   "pt-BR": { name: "Português (Brasil)", strings: ptBR, defaults: { tempUnit: "C", dateFormat: "dmy" } },
   "en-US": { name: "English (US)", strings: enUS, defaults: { tempUnit: "F", dateFormat: "mdy" } },
+  "es": { name: "Español", strings: es, defaults: { tempUnit: "C", dateFormat: "dmy" } },
 };
 export const FALLBACK_LANG = "en-US";
 
@@ -19,6 +21,7 @@ export function resolveLanguage(pref) {
     const lc = String(c).toLowerCase();
     if (lc.startsWith("pt")) return "pt-BR";
     if (lc.startsWith("en")) return "en-US";
+    if (lc.startsWith("es")) return "es";
   }
   return FALLBACK_LANG;
 }

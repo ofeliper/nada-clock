@@ -11,12 +11,15 @@ import { enhanceSelects, handleSelectTap } from "./picker.js";
 import * as update from "./update.js";
 import * as timers from "./timer.js";
 import * as pomodoro from "./pomodoro.js";
+import * as share from "./share.js";
 
-export const VERSION = "0.5.1";
+const REPO = "https://github.com/ofeliper/nada-clock";
+
+export const VERSION = "0.6.0";
 
 const DATE_FORMATS = ["auto", "dmy", "mdy", "ymd", "short", "long"];
 const SEPARATORS = ["/", "-", "."];
-const FONTS = ["thin", "regular", "bold", "mono", "rounded"];
+const FONTS = ["rounded", "thin", "regular", "bold", "mono", "led"];
 
 let root, body, onCloseCb, getWakeLockState;
 let selectedSlot = "T";       // posição selecionada no editor do Customizado
@@ -30,6 +33,9 @@ let cityQuery = "";
 let cityError = "";
 let tempNeedsLocation = false;
 let dragJustEnded = false;
+let sharePanel = null;        // { url, title } — painel de compartilhar preset aberto
+let shareMsg = "";
+let backupMsg = "";
 
 export function initSettings({ onClose, wakeLockState }) {
   root = document.getElementById("settings");
@@ -66,19 +72,26 @@ export function isOpen() {
 }
 
 export function open() {
+  returnFocus = document.activeElement;
   resetArmed = false;
   updateStatus = "";
   locAsk = false;
   cityResults = null;
   cityError = "";
   tempNeedsLocation = false;
+  sharePanel = null;
+  shareMsg = "";
+  backupMsg = "";
   root.hidden = false;
+  setTimeout(() => root.querySelector(".settings-close")?.focus({ preventScroll: true }), 30);
   render();
 }
 
+let returnFocus = null;
 export function close() {
   root.hidden = true;
   onCloseCb?.();
+  try { returnFocus?.focus?.({ preventScroll: true }); } catch { /* ok */ }
 }
 
 export function refresh() {
@@ -136,7 +149,18 @@ function render() {
       ${s.nightEnabled ? `
         ${timeRow("nightStart", t("night.start"), s.nightStart)}
         ${timeRow("nightEnd", t("night.end"), s.nightEnd)}
+        ${switchRow("nightColor", t("night.color"), s.nightColor !== false, t("night.colorHint"))}
+        <div class="row"><span class="row-label">${t("night.brightness")}<span class="row-hint">${Math.round((s.nightBrightness ?? 1) * 100)}%</span></span>
+          <input type="range" class="range" data-key="nightBrightness" min="0.05" max="1" step="0.05" value="${s.nightBrightness ?? 1}"></div>
       ` : ""}
+    `)}
+
+    ${group(t("group.backup"), backupSection())}
+
+    ${group(t("group.about"), `
+      <a class="row link-row" href="${aboutHref()}" target="_blank" rel="noopener">${t("about.page")}<span aria-hidden="true">›</span></a>
+      <a class="row link-row" href="${REPO}/issues/new/choose" target="_blank" rel="noopener">${t("about.suggest")}<span aria-hidden="true">›</span></a>
+      <a class="row link-row" href="${REPO}" target="_blank" rel="noopener">${t("about.source")}<span aria-hidden="true">›</span></a>
     `)}
 
     ${group(t("group.general"), `
@@ -150,6 +174,7 @@ function render() {
         { value: "light", label: t("general.uiLight") },
       ], s.uiTheme)}
       ${switchRow("burnIn", t("general.burnin"), s.burnIn, t("general.burninHint"))}
+      ${switchRow("mirror", t("general.mirror"), s.mirror, t("general.mirrorHint"))}
       <div class="row">
         <span class="row-label">${t("general.wakeLock")}
           <span class="row-hint ${getWakeLockState() === "on" ? "" : "warn"}">${wakeLockText()}</span>
@@ -198,6 +223,11 @@ function addClearButtons(container) {
   });
 }
 
+function aboutHref() {
+  const lang = getLanguage();
+  return lang === "pt-BR" ? "sobre/" : lang === "es" ? "acerca/" : "about/";
+}
+
 function swatch(th, pressed) {
   const isSystem = th === "system";
   const style = isSystem ? "" : `style="color:${THEMES[th].fg};background:${THEMES[th].bg}"`;
@@ -235,6 +265,7 @@ function clockSection(s) {
     rows += switchRow(null, t("center.seconds"), c.seconds, "", 'data-clock="seconds"');
     rows += switchRow(null, t("center.blink"), c.blink, "", 'data-clock="blink"');
     rows += selectRow(null, t("center.font"), FONTS.map((f) => ({ value: f, label: t("font." + f) })), c.font, 'data-clock="font"');
+    rows += switchRow(null, t("clock.flip"), c.flip, t("clock.flipHint"), 'data-clock="flip"');
   } else {
     rows += switchRow(null, t("center.analogHourNumbers"), c.analogHourNumbers, "", 'data-clock="analogHourNumbers"');
     rows += switchRow(null, t("center.analogMinuteNumbers"), c.analogMinuteNumbers, "", 'data-clock="analogMinuteNumbers"');
@@ -289,6 +320,7 @@ function slotsSection(s) {
       break;
     case "temperature":
       if (!s.tempEnabled) rows += hintRow(t("comp.tempOff"), true);
+      rows += switchRow(null, t("temp.icon"), cfg.icon !== false, "", 'data-slotfield="icon"');
       rows += switchRow(null, t("temp.condition"), cfg.condition !== false, "", 'data-slotfield="condition"');
       for (const k of WEATHER_EXTRAS) rows += switchRow(null, t("wxopt." + k), !!cfg[k], "", `data-slotfield="${k}"`);
       break;
@@ -323,6 +355,9 @@ function presetsSection(s) {
         <button type="button" class="btn primary" data-action="preset-save">${t("presets.save")}</button>
       </span>
     </div>`;
+  rows += `<div class="row"><span class="row-label"></span>
+    <button type="button" class="btn" data-action="share-current">${t("share.current")}</button></div>`;
+  if (sharePanel) rows += shareBox();
   if (!s.presets.length) rows += hintRow(t("presets.empty"));
   for (const p of s.presets) {
     rows += `
@@ -330,11 +365,48 @@ function presetsSection(s) {
         <span class="row-label">${esc(p.name)}</span>
         <span class="preset-actions">
           <button type="button" class="btn" data-action="preset-apply" data-value="${esc(p.id)}">${t("presets.apply")}</button>
+          <button type="button" class="btn icon-btn" data-action="preset-share" data-value="${esc(p.id)}" aria-label="${esc(t("share.share"))}">
+            <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M8 7l4-4 4 4M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>
+          </button>
           <button type="button" class="btn icon-btn" data-action="preset-delete" data-value="${esc(p.id)}" aria-label="${esc(t("presets.delete"))}">✕</button>
         </span>
       </div>`;
   }
   return group(t("group.presets"), rows);
+}
+
+function shareBox() {
+  return `
+    <div class="share-box">
+      <div class="share-qr" role="img" aria-label="${esc(t("share.qr"))}">${share.qrSvg(sharePanel.url)}</div>
+      <div class="share-side">
+        <strong>${esc(sharePanel.title)}</strong>
+        <span class="row-hint">${t("share.hint")}</span>
+        <code class="share-url">${esc(sharePanel.url)}</code>
+        <span class="notice-actions wrap">
+          <button type="button" class="btn primary" data-action="share-send">${t("share.share")}</button>
+          <button type="button" class="btn" data-action="share-copy">${t("share.copy")}</button>
+          <button type="button" class="btn" data-action="share-close">${t("settings.close")}</button>
+        </span>
+        ${shareMsg ? `<span class="row-hint">${shareMsg}</span>` : ""}
+      </div>
+    </div>`;
+}
+
+// ---------- Backup ----------
+function backupSection() {
+  return `
+    <div class="row">
+      <span class="row-label">${t("backup.hint")}</span>
+    </div>
+    <div class="row">
+      <span class="notice-actions wrap" style="margin:0">
+        <button type="button" class="btn" data-action="backup-export">${t("backup.export")}</button>
+        <button type="button" class="btn" data-action="backup-import">${t("backup.import")}</button>
+      </span>
+      <input type="file" id="backup-file" accept="application/json,.json" hidden>
+    </div>
+    ${backupMsg ? hintRow(backupMsg, backupMsg === t("backup.invalid")) : ""}`;
 }
 
 // ---------- Customizado: cores ----------
@@ -445,6 +517,7 @@ function temperatureSection(s, lang) {
     else hint = t("temp.never");
     const errorHint = status === "error" ? `<span class="row-hint warn">${t("temp.error")}</span>` : "";
     rows += selectRow("tempUnit", t("temp.unit"), [{ value: "C", label: "°C" }, { value: "F", label: "°F" }], unit);
+    rows += switchRow("tempIcon", t("temp.icon"), s.tempIcon);
     rows += switchRow("tempCondition", t("temp.condition"), s.tempCondition, t("temp.conditionHint"));
     rows += `
       <div class="row">
@@ -700,10 +773,15 @@ function applyField(el, live) {
     } else if ("locmode" in d) {
       onLocationMode(value);
     } else if (d.key) {
-      store.set({ [d.key]: value });
+      store.set({ [d.key]: el.type === "range" ? Number(value) : value });
     }
   } finally {
     suppressRender = false;
+  }
+  // controle deslizante com % ao lado: atualiza o número enquanto arrasta
+  if (el.type === "range" && el.dataset.key === "nightBrightness") {
+    const hint = el.closest(".row")?.querySelector(".row-hint");
+    if (hint) hint.textContent = Math.round(Number(el.value) * 100) + "%";
   }
   // atualiza a prévia do texto sem redesenhar o painel
   if (el.id) {
@@ -821,6 +899,40 @@ function onClick(e) {
       break;
     }
     case "preset-apply": store.applyPreset(value); break;
+    case "preset-share": {
+      const p = store.get().presets.find((x) => x.id === value);
+      if (p) { sharePanel = { url: share.presetLink(p.data, p.name), title: p.name }; shareMsg = ""; render(); }
+      break;
+    }
+    case "share-current":
+      sharePanel = { url: share.presetLink(share.currentLayout(), ""), title: t("share.currentTitle") };
+      shareMsg = "";
+      render();
+      break;
+    case "share-close": sharePanel = null; render(); break;
+    case "share-copy":
+      share.copyText(sharePanel.url).then((r) => { shareMsg = t(r === "copied" ? "share.copied" : "share.failed"); render(); });
+      break;
+    case "share-send":
+      share.shareLink(sharePanel.url, "NADA Clock — " + sharePanel.title).then((r) => {
+        if (r === "copied" || r === "failed") { shareMsg = t(r === "copied" ? "share.copied" : "share.failed"); render(); }
+      });
+      break;
+    case "backup-export":
+      share.exportBackup().then((r) => { backupMsg = r === "cancelled" ? "" : t("backup.exported"); render(); });
+      break;
+    case "backup-import": {
+      const input = body.querySelector("#backup-file");
+      input.onchange = async () => {
+        const f = input.files?.[0];
+        if (!f) return;
+        try { await share.importBackup(f); backupMsg = t("backup.imported"); }
+        catch { backupMsg = t("backup.invalid"); }
+        render();
+      };
+      input.click();
+      break;
+    }
     case "preset-delete": store.deletePreset(value); break;
 
     case "token": {

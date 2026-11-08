@@ -4,14 +4,15 @@
 
 Funciona como um app instalado na Tela de Início (PWA): tela cheia, tela sempre ligada, funciona offline.
 
-## Funcionalidades (v0.5.1)
+## Funcionalidades (v0.6.0)
 
 - Quatro abas: **Relógio**, **Timer**, **Cronômetro** e **Pomodoro** — troque pela barra do topo (aparece com um toque) ou deslizando para o lado
+- **Timer**: vários ao mesmo tempo, com nome (ex.: "macarrão", "forno")
 - **Pomodoro**: foco, pausa curta e pausa longa a cada N focos, com durações configuráveis e início automático opcional
 - Troca rápida **digital ⇄ analógico** pelo botão na barra do topo
 - **Timer**: ajuste de horas/minutos/segundos (segure para repetir), atalhos (1–60 min), pausa, +1 min e alarme; continua certo em segundo plano
 - **Cronômetro**: voltas (parcial e total), pausa e zerar; o estado fica salvo
-- Relógio **digital** (12/24h, segundos, dois-pontos piscando, 5 fontes) ou **analógico** — as opções valem para os dois mostradores
+- Relógio **digital** (12/24h, segundos, dois-pontos piscando, 6 fontes incluindo **LED de 7 segmentos**, estilo **plaquinha/flip**) ou **analógico** — as opções valem para os dois mostradores
 - Mostrador **Minimalista**: relógio + dia e data (acima ou abaixo, coladinhos no relógio)
 - Mostrador **Customizado**: 11 posições (bordas de cima e de baixo, logo acima/abaixo do relógio e laterais)
   - Arraste uma posição sobre outra para trocar — inclusive o relógio, que pode ir para qualquer lugar
@@ -21,6 +22,12 @@ Funciona como um app instalado na Tela de Início (PWA): tela cheia, tela sempre
   - Cores personalizadas: fundo, principal e uma cor para horas, minutos e segundos
 - 7 paletas: **Sistema** (padrão; segue o modo claro/escuro do aparelho), Terminal, Âmbar, Neve, Gelo, Noturno e Papel (clara)
 - **Restaurar padrão** nas configurações
+- **Backup**: exportar e importar todas as configurações (arquivo JSON, sem a localização)
+- **Compartilhar presets** por link ou QR code (o layout vai codificado no próprio link, sem servidor)
+- **Bloqueio de toques**: cadeado na barra; toque e segure para desbloquear
+- **Modo espelho** (reflexo no vidro / HUD de carro)
+- **Modo noturno**: cor vermelha opcional e brilho reduzido no horário escolhido
+- **Ícone do tempo** junto da temperatura
 - **Forçar horizontal**: gira o app mesmo com a rotação do aparelho travada (botão na barra do topo), com transição e escolha do lado da câmera; os seletores das configurações giram junto
 - **Sons**: a cada segundo (tic-tac), minuto, hora (com opção de repetir conforme a hora) e personalizado (a cada X minutos ou no minuto X), com volume e silêncio no modo noturno
 - Relógio analógico com números das horas e/ou dos minutos, marcas de cada minuto e ponteiro de segundos deslizante
@@ -38,7 +45,8 @@ Funciona como um app instalado na Tela de Início (PWA): tela cheia, tela sempre
   - No Customizado: sensação térmica, máxima/mínima do dia, umidade, chance de chuva e vento
   - Placeholders: `{weather} {feels} {tmax} {tmin} {humidity} {rain}`
 - **Nascer/pôr do sol** calculado no próprio aparelho
-- Idiomas: **Português (Brasil)** e **English (US)**, com detecção automática
+- Idiomas: **Português (Brasil)**, **English (US)** e **Español**, com detecção automática
+- Páginas **Sobre** com instruções de instalação e perguntas frequentes: [Português](https://ofeliper.github.io/nada-clock/sobre/) · [English](https://ofeliper.github.io/nada-clock/about/) · [Español](https://ofeliper.github.io/nada-clock/acerca/)
 - Formatos de data: automático, DD/MM/AAAA, MM/DD/AAAA, ISO, por extenso, com escolha do separador
 
 ## Publicar no GitHub Pages
@@ -61,7 +69,7 @@ Abra o endereço no Chrome → menu ⋮ → **Instalar app** (ou *Adicionar à t
 
 ## Publicar uma nova versão
 
-Ao alterar arquivos, aumente `CACHE_VERSION` em `sw.js` (ex.: `nada-clock-v0.5.1`) e `VERSION` em `js/settings.js`. Assim os aparelhos baixam os arquivos novos.
+Ao alterar arquivos, aumente `CACHE_VERSION` em `sw.js` (ex.: `nada-clock-v0.6.1`) e `VERSION` em `js/settings.js`. Assim os aparelhos baixam os arquivos novos.
 
 ## Estrutura
 
@@ -81,6 +89,14 @@ js/picker.js            seletor próprio (substitui o select nativo)
 js/update.js            atualizações do app (service worker)
 js/pomodoro.js          aba Pomodoro
 js/location.js          localização (GPS, IP ou cidade)
+js/share.js             backup e compartilhamento de presets (link e QR code)
+js/vendor/qrcode.js     gerador de QR code (qrcode-generator, MIT, Kazuhiko Arase)
+js/i18n/es.js           textos em espanhol
+sobre/ about/ acerca/   páginas Sobre (HTML estático, geradas por tools/build_about.py)
+css/about.css           visual das páginas Sobre
+assets/                 prints e imagens de prévia (Open Graph)
+sitemap.xml             mapa do site para buscadores
+.github/ISSUE_TEMPLATE/ modelos de sugestão e de problema
 js/settings.js          painel de configurações
 js/weather.js           temperatura (Open-Meteo)
 js/store.js             preferências salvas no aparelho
@@ -106,7 +122,22 @@ python3 -m http.server 8000
 - [x] Vários presets salvos no Customizado
 - [x] Nascer/pôr do sol
 - [x] Pomodoro
+- [ ] Métricas anônimas (ex.: GoatCounter) e domínio próprio — adiados
 - [ ] Análise (adiada): app nativo com widget / Live Activity (Dynamic Island) para Timer e Pomodoro
+
+## Sugestões e problemas
+
+Abra uma [issue](https://github.com/ofeliper/nada-clock/issues/new/choose) — há modelos para **sugestão de melhoria** e **relato de problema**.
+
+## Páginas Sobre e SEO
+
+As páginas `sobre/`, `about/` e `acerca/` são geradas a partir dos textos em `tools/build_about.py`:
+
+```bash
+python3 tools/build_about.py
+```
+
+Depois de publicar, cadastre o site no [Google Search Console](https://search.google.com/search-console) e envie `https://ofeliper.github.io/nada-clock/sitemap.xml`.
 
 ## Privacidade e serviços externos
 

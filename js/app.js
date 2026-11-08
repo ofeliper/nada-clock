@@ -1,7 +1,7 @@
 // NADA Clock — No Ads, Display Always
 import * as store from "./store.js";
 import * as weather from "./weather.js";
-import { resolveLanguage, setLanguage, translateStatic } from "./i18n.js";
+import { resolveLanguage, setLanguage, translateStatic, t } from "./i18n.js";
 import { mountFace, updateFace, relayout } from "./faces.js";
 import * as settings from "./settings.js";
 import { THEMES, resolveTheme, onSystemChange } from "./themes.js";
@@ -11,6 +11,7 @@ import * as pomodoro from "./pomodoro.js";
 import * as location from "./location.js";
 import * as update from "./update.js";
 import { initPicker } from "./picker.js";
+import * as share from "./share.js";
 
 const $ = (id) => document.getElementById(id);
 const stage = $("stage");
@@ -47,7 +48,8 @@ const themeMeta = document.querySelector('meta[name="theme-color"]');
 
 function applyTheme(now = new Date()) {
   const s = store.get();
-  const night = s.nightEnabled && isNightTime(now, s.nightStart, s.nightEnd);
+  const nightTime = s.nightEnabled && isNightTime(now, s.nightStart, s.nightEnd);
+  const night = nightTime && s.nightColor !== false;   // usa a cor Noturno
   const theme = night ? "night" : resolveTheme(s.theme);
   const html = document.documentElement;
   if (html.dataset.theme !== theme) html.dataset.theme = theme;
@@ -69,6 +71,9 @@ function applyTheme(now = new Date()) {
   // aparência do menu: automático = acompanha o fundo do relógio
   const ui = s.uiTheme === "light" || s.uiTheme === "dark" ? s.uiTheme : (isLight(bg) ? "light" : "dark");
   if (html.dataset.ui !== ui) html.dataset.ui = ui;
+
+  // brilho reduzido no horário noturno
+  applyBrightness(store.get().brightness, now);
 }
 
 function nightActive(now = new Date()) {
@@ -87,8 +92,10 @@ function isLight(hex) {
 onSystemChange(() => applyTheme());
 
 // ---------------- Brilho ----------------
-function applyBrightness(v) {
-  rootStyle.setProperty("--brightness", String(v));
+function applyBrightness(v, now = new Date()) {
+  const s = store.get();
+  const cap = nightActive(now) ? Math.max(0.05, Number(s.nightBrightness) || 1) : 1;
+  rootStyle.setProperty("--brightness", String(Math.min(v, cap)));
 }
 
 let indicatorTimer;
@@ -144,10 +151,66 @@ function toggleUI() {
   document.body.classList.contains("ui-visible") ? hideUI() : showUI();
 }
 
+// teclado: Tab mostra os controles (e os mantém visíveis enquanto há foco neles)
+document.addEventListener("keydown", (e) => { if (e.key === "Tab" && !locked) showUI(); });
+document.getElementById("topbar").addEventListener("focusin", () => { if (!locked) showUI(); });
+
 $("settings-button").addEventListener("click", () => {
   hideUI();
   settings.open();
 });
+
+// ---------------- Modo espelho ----------------
+function applyMirror() {
+  document.documentElement.classList.toggle("mirror", !!store.get().mirror);
+}
+
+// ---------------- Bloqueio de toques ----------------
+// Bloqueado: uma camada transparente segura todos os toques. Segurar 1,5 s desbloqueia.
+const HOLD_MS = 1500;
+let locked = false, holdTimer = 0, hintTimer = 0;
+const shield = $("lock-shield");
+const lockHint = $("lock-hint");
+rootStyle.setProperty("--hold-ms", HOLD_MS + "ms");
+
+function setLocked(on) {
+  locked = on;
+  shield.hidden = !on;
+  document.documentElement.classList.toggle("locked", on);
+  $("lock-button").classList.toggle("active", on);
+  if (on) { hideUI(); flashLockHint(); }
+  else { lockHint.classList.remove("visible", "holding"); showUI(); }
+}
+
+function flashLockHint() {
+  lockHint.classList.add("visible");
+  clearTimeout(hintTimer);
+  hintTimer = setTimeout(() => { if (!holdTimer) lockHint.classList.remove("visible"); }, 2200);
+}
+
+$("lock-button").addEventListener("click", () => setLocked(true));
+shield.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  sound.unlock();
+  requestWakeLock();
+  flashLockHint();
+  lockHint.classList.remove("holding");
+  void lockHint.offsetWidth;            // reinicia a animação do anel
+  lockHint.classList.add("holding");
+  clearTimeout(holdTimer);
+  holdTimer = setTimeout(() => { holdTimer = 0; setLocked(false); }, HOLD_MS);
+});
+const cancelHold = () => {
+  if (!holdTimer) return;
+  clearTimeout(holdTimer);
+  holdTimer = 0;
+  lockHint.classList.remove("holding");
+  flashLockHint();
+};
+shield.addEventListener("pointerup", cancelHold);
+shield.addEventListener("pointercancel", cancelHold);
+shield.addEventListener("pointerleave", cancelHold);
+shield.addEventListener("contextmenu", (e) => e.preventDefault());
 
 // ---------------- Rotação forçada ----------------
 // Com a rotação do aparelho travada, o app inteiro é girado 90° via CSS.
@@ -280,7 +343,7 @@ function toAppDelta(dxScreen, dyScreen) {
 let gesture = null;
 
 stage.addEventListener("pointerdown", (e) => {
-  if (e.target.closest("button, input, select, a, label, .sw-laps")) return; // botões e lista de voltas
+  if (e.target.closest("button, input, select, a, label, .sw-laps, .tm-list")) return; // botões e lista de voltas
   gesture = {
     id: e.pointerId,
     startY: e.clientY,
@@ -379,6 +442,8 @@ store.subscribe((s, patch) => {
   if (["theme", "nightEnabled", "nightStart", "nightEnd", "face", "custom", "uiTheme"].some((k) => k in patch)) applyTheme();
   if ("orientation" in patch || "rotateDir" in patch) { applyOrientation(pendingRotateAnim || "orientation" in patch); pendingRotateAnim = false; }
   if ("burnIn" in patch) applyBurnIn();
+  if ("mirror" in patch) applyMirror();
+  if (["nightBrightness", "nightColor"].some((k) => k in patch)) applyTheme();
   if ("brightness" in patch) applyBrightness(s.brightness);
   if (["face", "custom", "clock", "infoPosition", "presets"].some((k) => k in patch)) mountFace(grid);
   relayout();
@@ -388,6 +453,7 @@ weather.subscribe(() => { relayout(); tick(); });
 
 // ---------------- Início ----------------
 applyLanguage();
+applyMirror();
 applyTheme();
 applyOrientation();
 applyBrightness(store.get().brightness);
@@ -419,3 +485,21 @@ window.__nadaReady = true;
 
 // Service worker: offline, instalação na Tela de Início e atualizações
 update.init();
+
+// Layout compartilhado por link (#p=...)
+function checkSharedLink() {
+  const shared = share.readSharedFromUrl();
+  if (!shared) return;
+  const box = $("share-prompt");
+  box.querySelector("[data-text]").textContent = shared.name
+    ? t("share.received", { name: shared.name }) : t("share.receivedNoName");
+  box.hidden = false;
+  box.onclick = (e) => {
+    const b = e.target.closest("[data-share]");
+    if (!b) return;
+    if (b.dataset.share === "apply") share.applyShared(shared, t("share.receivedPreset"));
+    box.hidden = true;
+  };
+}
+checkSharedLink();
+window.addEventListener("hashchange", checkSharedLink);

@@ -1,0 +1,48 @@
+name: 🐞 Relatar problema / Bug report
+description: Algo não funcionou como esperado. / Something didn't work as expected.
+title: "[Problema] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por avisar! Pode escrever em português, inglês ou espanhol.
+        Thanks for reporting! Feel free to write in Portuguese, English or Spanish.
+  - type: textarea
+    id: what
+    attributes:
+      label: O que aconteceu? / What happened?
+      description: E o que você esperava que acontecesse? / And what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Como reproduzir / Steps to reproduce
+      placeholder: |
+        1. Abrir... / Open...
+        2. Tocar em... / Tap...
+  - type: input
+    id: device
+    attributes:
+      label: Aparelho e sistema / Device and OS
+      placeholder: "Ex.: iPhone 15, iOS 26.1 · Pixel 8, Android 15"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Versão do NADA Clock / NADA Clock version
+      description: Em Configurações → Geral. / In Settings → General.
+      placeholder: "0.6.0"
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Como abriu o app? / How did you open the app?
+      options:
+        - Ícone na tela de início / Home screen icon
+        - Aba do navegador / Browser tab
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Prints (opcional) / Screenshots (optional)

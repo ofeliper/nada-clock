@@ -18,7 +18,8 @@ export const DEFAULT_CLOCK = {
   hour12: false,
   seconds: true,
   blink: false,             // dois-pontos piscando
-  font: "rounded",          // thin | regular | bold | mono | rounded
+  font: "rounded",          // thin | regular | bold | mono | rounded | led
+  flip: false,              // estilo plaquinha (flip clock)
   analogSeconds: true,      // ponteiro de segundos
   analogSmooth: false,      // ponteiro de segundos deslizando (contínuo)
   analogHourNumbers: false,
@@ -82,11 +83,15 @@ export const DEFAULTS = {
   tempEnabled: false,
   tempUnit: null,          // null = padrão do idioma; "C" | "F"
   tempCondition: true,     // mostra a condição junto: "17°C, chuva forte"
+  tempIcon: true,          // ícone do tempo (☀️ 🌧️) antes da temperatura
   location: DEFAULT_LOCATION,
   nightEnabled: false,
   nightStart: "22:00",
   nightEnd: "07:00",
+  nightColor: true,        // no horário noturno, usa a cor Noturno (vermelho)
+  nightBrightness: 1,      // brilho máximo no horário noturno (1 = não muda)
   burnIn: true,
+  mirror: false,           // espelha o mostrador (reflexo no vidro, HUD de carro)
   brightness: 1,           // 0.05 – 1
   tab: "clock",            // clock | timer | stopwatch | pomodoro
   orientation: "auto",     // auto | landscape (forçar horizontal)
@@ -240,6 +245,15 @@ export function applyPreset(id) {
 
 export function deletePreset(id) {
   set({ presets: state.presets.filter((x) => x.id !== id) });
+}
+
+/** Restaura um backup (mantém a localização atual deste aparelho). */
+export function importSettings(obj) {
+  const fresh = hydrate({ ...obj, location: state.location });
+  const patch = Object.fromEntries(Object.keys(fresh).map((k) => [k, fresh[k]]));
+  state = fresh;
+  writeJSON(KEY, state);
+  listeners.forEach((fn) => fn(state, patch));
 }
 
 /** Volta tudo à configuração original. */

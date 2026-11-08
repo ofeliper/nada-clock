@@ -2,7 +2,8 @@
 // Cada componente: { mount(el), update(now), isEmpty?() }
 import * as store from "./store.js";
 import { t, formatDate, formatWeekday, getLanguage } from "./i18n.js";
-import { expand, tempWithCondition, weatherExtra } from "./tokens.js";
+import { expand, tempWithCondition, weatherExtra, weatherData } from "./tokens.js";
+import { conditionIcon } from "./weather.js";
 
 const pad = (n) => String(n).padStart(2, "0");
 const esc = (str) => String(str).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -30,38 +31,79 @@ function textComponent(render, { className = "comp-text" } = {}) {
 }
 
 // ---------------- Relógio digital ----------------
+// Estilos: fonte normal, "led" (7 segmentos desenhados em SVG) e "flip" (plaquinhas que viram).
+const SEG_SHAPES = {
+  a: "10,2 50,2 55,7 50,12 10,12 5,7",
+  b: "48,10 53,5 58,10 58,43 53,48 48,43",
+  c: "48,57 53,52 58,57 58,90 53,95 48,90",
+  d: "10,88 50,88 55,93 50,98 10,98 5,93",
+  e: "2,57 7,52 12,57 12,90 7,95 2,90",
+  f: "2,10 7,5 12,10 12,43 7,48 2,43",
+  g: "10,45 50,45 55,50 50,55 10,55 5,50",
+};
+const SEG_ON = ["abcdef", "bc", "abged", "abgcd", "fgbc", "afgcd", "afgedc", "abc", "abcdefg", "abcdfg"];
+
+export function ledDigit(d) {
+  const on = SEG_ON[Number(d)] || "";
+  return `<svg class="led" viewBox="0 0 60 100" aria-hidden="true">${
+    Object.entries(SEG_SHAPES).map(([k, pts]) => `<polygon points="${pts}" class="${on.includes(k) ? "on" : "off"}"/>`).join("")
+  }</svg>`;
+}
+const LED_COLON = '<svg class="led led-colon" viewBox="0 0 20 100" aria-hidden="true"><rect x="4" y="26" width="12" height="12" rx="2" class="on"/><rect x="4" y="62" width="12" height="12" rx="2" class="on"/></svg>';
+
+const reduceMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
 export function clockDigital(opts = {}) {
-  const { hour12 = false, seconds = true, blink = false, font = "thin" } = opts;
-  let els;
+  const { hour12 = false, seconds = true, blink = false, font = "thin", flip = false } = opts;
+  const led = font === "led";
+  let cells = [], seps, ampm, timerEl, lastLabel = "";
+
+  const paint = (cell, ch) => { cell.innerHTML = led ? ledDigit(ch) : ch; };
+
+  function setDigit(cell, ch) {
+    if (cell.dataset.v === ch) return;
+    const first = cell.dataset.v == null;
+    cell.dataset.v = ch;
+    if (!flip || first || reduceMotion() || !cell.animate) { paint(cell, ch); return; }
+    // plaquinha: vira até a metade, troca o número, termina de virar
+    const out = cell.animate([{ transform: "rotateX(0deg)" }, { transform: "rotateX(-90deg)" }], { duration: 140, easing: "ease-in" });
+    out.onfinish = () => {
+      paint(cell, cell.dataset.v);
+      cell.animate([{ transform: "rotateX(90deg)" }, { transform: "rotateX(0deg)" }], { duration: 160, easing: "ease-out" });
+    };
+  }
+
   return {
     mount(el) {
       const size = seconds ? (hour12 ? "size-hms-ampm" : "size-hms") : (hour12 ? "size-hm-ampm" : "size-hm");
-      el.innerHTML = `<div class="clock-digital font-${font} ${size}" role="timer">`
-        + `<span class="hh"></span><span class="sep">:</span><span class="mm"></span>`
-        + (seconds ? `<span class="sep">:</span><span class="ss"></span>` : "")
+      const group = (cls) => `<span class="grp ${cls}"><span class="dg"></span><span class="dg"></span></span>`;
+      const sep = `<span class="sep">${led ? LED_COLON : ":"}</span>`;
+      el.innerHTML = `<div class="clock-digital font-${font} ${size} ${flip ? "flip" : ""}" role="timer" aria-live="off">`
+        + group("hh") + sep + group("mm")
+        + (seconds ? sep + group("ss") : "")
         + (hour12 ? `<span class="ampm"></span>` : "")
         + `</div>`;
-      els = {
-        hh: el.querySelector(".hh"),
-        mm: el.querySelector(".mm"),
-        ss: el.querySelector(".ss"),
-        ampm: el.querySelector(".ampm"),
-        seps: el.querySelectorAll(".sep"),
-      };
+      timerEl = el.querySelector(".clock-digital");
+      cells = [...el.querySelectorAll(".dg")];
+      seps = el.querySelectorAll(".sep");
+      ampm = el.querySelector(".ampm");
+      lastLabel = "";
     },
     update(now) {
       let h = now.getHours();
       if (hour12) {
-        els.ampm.textContent = h < 12 ? "AM" : "PM";
+        ampm.textContent = h < 12 ? "AM" : "PM";
         h = h % 12 || 12;
       }
-      els.hh.textContent = pad(h);
-      els.mm.textContent = pad(now.getMinutes());
-      if (els.ss) els.ss.textContent = pad(now.getSeconds());
+      const str = pad(h) + pad(now.getMinutes()) + (seconds ? pad(now.getSeconds()) : "");
+      for (let i = 0; i < cells.length; i++) setDigit(cells[i], str[i]);
       if (blink) {
         const dim = now.getSeconds() % 2 === 1;
-        els.seps.forEach((s) => s.classList.toggle("dim", dim));
+        seps.forEach((s) => s.classList.toggle("dim", dim));
       }
+      // leitores de tela: rótulo atualizado por minuto (não a cada segundo)
+      const label = `${pad(h)}:${pad(now.getMinutes())}${hour12 ? " " + ampm.textContent : ""}`;
+      if (label !== lastLabel) { timerEl.setAttribute("aria-label", label); lastLabel = label; }
     },
   };
 }
@@ -148,9 +190,10 @@ export function infoLine() {
     const parts = [];
     if (s.showWeekday) parts.push(formatWeekday(now));
     if (s.showDate) parts.push(formatDate(now, s.dateFormat, s.dateSeparator));
+    const html = parts.map(esc);
     const temp = tempWithCondition(s.tempCondition);
-    if (temp) parts.push(temp);
-    return parts.map(esc).join('<span class="dot">·</span>');
+    if (temp) html.push(`<span class="nw">${iconFor(s.tempIcon)}${esc(temp)}</span>`);
+    return html.join('<span class="dot">·</span>');
   };
   const comp = textComponent(render, { className: "info-line" });
   comp.isEmpty = () => { const s = store.get(); return !s.showWeekday && !s.showDate && !s.tempEnabled; };
@@ -176,8 +219,14 @@ export const temperature = (opts = {}) => textComponent(() => {
   const main = tempWithCondition(opts.condition !== false);
   if (!main) return "";
   const extras = WEATHER_EXTRAS.filter((k) => opts[k]).map((k) => weatherExtra(k)).filter(Boolean);
-  return [main, ...extras].map(esc).join('<span class="dot">·</span>');
+  return `<span class="nw">${iconFor(opts.icon !== false)}${esc(main)}</span>` + extras.map((x) => '<span class="dot">·</span>' + esc(x)).join("");
 });
+
+function iconFor(enabled) {
+  if (!enabled) return "";
+  const w = weatherData();
+  return w ? conditionIcon(w.code, w.isDay) : "";
+}
 
 export const freeText = (opts = {}, big = false) =>
   textComponent((now) => esc(expand(opts.text || "", now)), { className: big ? "comp-text comp-text-big" : "comp-text" });

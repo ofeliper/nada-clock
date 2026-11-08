@@ -88,6 +88,39 @@ export function conditionKey(code, isDay = true) {
   return `wx.${code}`;
 }
 
+// Ícones simples (traço), na cor do relógio
+const I = (body) => `<svg class="wx-ic" viewBox="0 0 24 24" aria-hidden="true">${body}</svg>`;
+const SUN = '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>';
+const MOON = '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/>';
+const CLOUD = '<path d="M7 18h10a4 4 0 0 0 .5-8 6 6 0 0 0-11.4 1.6A3.3 3.3 0 0 0 7 18Z"/>';
+const SMALL_CLOUD = '<path d="M9 19h8.5a3.2 3.2 0 0 0 .4-6.4 4.8 4.8 0 0 0-9.1 1.3A2.6 2.6 0 0 0 9 19Z"/>';
+const ICONS = {
+  clearDay: I(SUN),
+  clearNight: I(MOON),
+  partlyDay: I('<circle cx="8" cy="8" r="3"/><path d="M8 2v1.5M2 8h1.5M3.8 3.8l1 1M12.2 3.8l-1 1"/>' + SMALL_CLOUD),
+  partlyNight: I('<path d="M12 6.5A4.5 4.5 0 1 1 5.5 2a3.6 3.6 0 0 0 6.5 4.5Z"/>' + SMALL_CLOUD),
+  cloud: I(CLOUD),
+  fog: I('<path d="M4 9h16M3 13h18M5 17h14"/>'),
+  drizzle: I(CLOUD.replace("18h10", "15h10").replace("0 0 7 18Z", "0 0 7 15Z") + '<path d="M9 19v1M13 19v1M17 19v1"/>'),
+  rain: I(CLOUD.replace("18h10", "14h10").replace("0 0 7 18Z", "0 0 7 14Z") + '<path d="M8 17l-1 3M12 17l-1 3M16 17l-1 3"/>'),
+  snow: I(CLOUD.replace("18h10", "14h10").replace("0 0 7 18Z", "0 0 7 14Z") + '<path d="M8 18h.01M12 20h.01M16 18h.01M10 21.5h.01M14 21.5h.01"/>'),
+  thunder: I(CLOUD.replace("18h10", "14h10").replace("0 0 7 18Z", "0 0 7 14Z") + '<path d="M12.5 15 10 19h4l-2.5 4"/>'),
+};
+
+/** Ícone SVG da condição do tempo (código WMO). */
+export function conditionIcon(code, isDay = true) {
+  if (code == null) return "";
+  if (code === 0 || code === 1) return isDay ? ICONS.clearDay : ICONS.clearNight;
+  if (code === 2) return isDay ? ICONS.partlyDay : ICONS.partlyNight;
+  if (code === 3) return ICONS.cloud;
+  if (code === 45 || code === 48) return ICONS.fog;
+  if (code >= 51 && code <= 57) return ICONS.drizzle;
+  if ((code >= 61 && code <= 67) || (code >= 80 && code <= 82)) return ICONS.rain;
+  if ((code >= 71 && code <= 77) || code === 85 || code === 86) return ICONS.snow;
+  if (code >= 95) return ICONS.thunder;
+  return ICONS.cloud;
+}
+
 /** Chamado periodicamente: atualiza se o dado estiver velho ou se a localização mudou. */
 export function tick() {
   if (!store.get().tempEnabled) return;

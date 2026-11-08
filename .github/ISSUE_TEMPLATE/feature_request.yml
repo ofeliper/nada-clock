@@ -1,0 +1,33 @@
+name: 💡 Sugestão de melhoria / Feature request
+description: Sugira uma funcionalidade ou melhoria para o NADA Clock. / Suggest a feature or improvement.
+title: "[Sugestão] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado pela sugestão! Pode escrever em português, inglês ou espanhol.
+        Thanks for the suggestion! Feel free to write in Portuguese, English or Spanish.
+  - type: textarea
+    id: idea
+    attributes:
+      label: O que você gostaria? / What would you like?
+      description: Descreva a ideia. / Describe the idea.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Por quê? / Why?
+      description: Em que situação isso ajudaria? / When would it help?
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área / Area
+      options:
+        - Relógio / Clock
+        - Mostrador personalizado / Custom face
+        - Timer / Cronômetro / Pomodoro
+        - Clima / Weather
+        - Configurações / Settings
+        - Outra / Other

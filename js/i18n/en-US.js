@@ -45,7 +45,7 @@ export default {
   "temp.unsupported": "This browser doesn't provide location.",
 
   "night.enabled": "Enable on schedule",
-  "night.hint": "Uses the Night color (dark red) during the chosen interval.",
+  "night.hint": "During the chosen interval, the clock gets more discreet.",
   "night.start": "Start",
   "night.end": "End",
 
@@ -59,7 +59,7 @@ export default {
   "general.wakeLockUnsupported": "Not supported in this browser. On iPhone, add to Home Screen (iOS 18.4+).",
 
   "about.tagline": "No Ads, Display Always",
-  "about.gestures": "Swipe up/down: brightness · Tap: show controls",
+  "about.gestures": "Swipe up/down: brightness · Swipe sideways: switch tab · Tap: show controls",
 
   "brightness": "Brightness",
 
@@ -149,7 +149,7 @@ export default {
   // v0.3
   "rotate.label": "Rotate",
   "rotate.force": "Force landscape",
-  "rotate.hint": "Rotates the clock even with your device's rotation lock on. Shortcut: button in the bottom-right corner.",
+  "rotate.hint": "Rotates the clock even with your device's rotation lock on. Shortcut: rotate button in the top bar.",
   "rotate.side": "Camera side",
   "rotate.left": "Left",
   "rotate.right": "Right",
@@ -325,5 +325,49 @@ export default {
   "wx.95": "Thunderstorm",
   "wx.96": "Thunderstorm with hail",
   "wx.97": "Heavy thunderstorm",
-  "wx.99": "Thunderstorm with heavy hail"
+  "wx.99": "Thunderstorm with heavy hail",
+
+  // v0.6
+  "font.led": "LED (7 segments)",
+  "clock.flip": "Flip style",
+  "clock.flipHint": "Each digit on a card that flips when it changes.",
+  "temp.icon": "Show weather icon",
+  "night.color": "Use the Night color",
+  "night.colorHint": "Dark red, the least disruptive to sleep.",
+  "night.brightness": "Brightness at night",
+  "general.mirror": "Mirror mode",
+  "general.mirrorHint": "Flips the face to reflect on glass or use as a car HUD.",
+  "lock.label": "Lock touches",
+  "lock.hint": "Locked — touch and hold to unlock",
+  "timer.new": "Timer",
+  "timer.back": "Back",
+  "timer.name": "Timer name",
+  "timer.namePlaceholder": "Name (optional), e.g. pasta",
+  "timer.unnamed": "Timer",
+  "timer.doneShort": "Done!",
+  "share.current": "Share current layout",
+  "share.currentTitle": "Current layout",
+  "share.share": "Share",
+  "share.copy": "Copy link",
+  "share.copied": "Link copied.",
+  "share.failed": "Couldn't copy. Select the link and copy it manually.",
+  "share.qr": "QR code for the link",
+  "share.hint": "Anyone who opens the link (or scans the QR code) can apply this layout in their own NADA Clock.",
+  "share.received": "You received the layout “{name}”. Apply it?",
+  "share.receivedNoName": "You received a shared layout. Apply it?",
+  "share.receivedPreset": "Received layout",
+  "share.apply": "Apply",
+  "share.ignore": "Ignore",
+  "group.backup": "Backup",
+  "backup.hint": "Save all settings and presets to a file and restore them on another device. Your location is not included.",
+  "backup.export": "Export",
+  "backup.import": "Import",
+  "backup.exported": "Backup created.",
+  "backup.imported": "Settings restored.",
+  "backup.invalid": "This file is not a NADA Clock backup.",
+  "group.about": "About",
+  "about.page": "About NADA Clock and how to install",
+  "about.suggest": "Suggest an improvement or report a problem (GitHub)",
+  "about.source": "Source code on GitHub",
+  "general.languageEs": "Español"
 };

@@ -32,8 +32,8 @@ export function openPicker({ title = "", options = [], value, onSelect }) {
       <span>${esc(o.label)}</span><span class="check" aria-hidden="true">✓</span>
     </button>`).join("");
   root.hidden = false;
-  const sel = listEl.querySelector('[aria-selected="true"]');
-  if (sel) sel.scrollIntoView({ block: "center" });
+  const sel = listEl.querySelector('[aria-selected="true"]') || listEl.querySelector(".picker-opt");
+  if (sel) { sel.scrollIntoView({ block: "center" }); sel.focus({ preventScroll: true }); }
 }
 
 export function close() {

@@ -45,7 +45,7 @@ export default {
   "temp.unsupported": "Este navegador não oferece localização.",
 
   "night.enabled": "Ativar por horário",
-  "night.hint": "Usa a cor Noturno (vermelho escuro) no intervalo escolhido.",
+  "night.hint": "No intervalo escolhido, o relógio fica mais discreto.",
   "night.start": "Início",
   "night.end": "Fim",
 
@@ -59,7 +59,7 @@ export default {
   "general.wakeLockUnsupported": "Não suportado neste navegador. No iPhone, instale na Tela de Início (iOS 18.4+).",
 
   "about.tagline": "No Ads, Display Always",
-  "about.gestures": "Deslize para cima/baixo: brilho · Toque: mostrar controles",
+  "about.gestures": "Deslize para cima/baixo: brilho · Deslize para o lado: trocar de aba · Toque: mostrar controles",
 
   "brightness": "Brilho",
 
@@ -149,7 +149,7 @@ export default {
   // v0.3
   "rotate.label": "Girar",
   "rotate.force": "Forçar horizontal",
-  "rotate.hint": "Gira o relógio mesmo com a rotação do aparelho travada. Atalho: botão no canto inferior direito.",
+  "rotate.hint": "Gira o relógio mesmo com a rotação do aparelho travada. Atalho: botão de girar na barra do topo.",
   "rotate.side": "Lado da câmera",
   "rotate.left": "Esquerda",
   "rotate.right": "Direita",
@@ -325,5 +325,49 @@ export default {
   "wx.95": "Trovoada",
   "wx.96": "Trovoada com granizo",
   "wx.97": "Trovoada forte",
-  "wx.99": "Trovoada com granizo forte"
+  "wx.99": "Trovoada com granizo forte",
+
+  // v0.6
+  "font.led": "LED (7 segmentos)",
+  "clock.flip": "Estilo plaquinha (flip)",
+  "clock.flipHint": "Cada número numa plaquinha que vira ao mudar.",
+  "temp.icon": "Mostrar ícone do tempo",
+  "night.color": "Usar a cor Noturno",
+  "night.colorHint": "Vermelho escuro, o que menos atrapalha o sono.",
+  "night.brightness": "Brilho no horário noturno",
+  "general.mirror": "Modo espelho",
+  "general.mirrorHint": "Inverte o mostrador para refletir num vidro ou usar como HUD de carro.",
+  "lock.label": "Bloquear toques",
+  "lock.hint": "Bloqueado — toque e segure para desbloquear",
+  "timer.new": "Timer",
+  "timer.back": "Voltar",
+  "timer.name": "Nome do timer",
+  "timer.namePlaceholder": "Nome (opcional), ex.: macarrão",
+  "timer.unnamed": "Timer",
+  "timer.doneShort": "Pronto!",
+  "share.current": "Compartilhar layout atual",
+  "share.currentTitle": "Layout atual",
+  "share.share": "Compartilhar",
+  "share.copy": "Copiar link",
+  "share.copied": "Link copiado.",
+  "share.failed": "Não foi possível copiar. Selecione o link e copie manualmente.",
+  "share.qr": "QR code do link",
+  "share.hint": "Quem abrir o link (ou ler o QR code) pode aplicar este layout no próprio NADA Clock.",
+  "share.received": "Recebeu o layout “{name}”. Aplicar?",
+  "share.receivedNoName": "Recebeu um layout compartilhado. Aplicar?",
+  "share.receivedPreset": "Layout recebido",
+  "share.apply": "Aplicar",
+  "share.ignore": "Ignorar",
+  "group.backup": "Backup",
+  "backup.hint": "Salve todas as configurações e presets num arquivo e restaure em outro aparelho. A localização não vai junto.",
+  "backup.export": "Exportar",
+  "backup.import": "Importar",
+  "backup.exported": "Backup gerado.",
+  "backup.imported": "Configurações restauradas.",
+  "backup.invalid": "Este arquivo não é um backup do NADA Clock.",
+  "group.about": "Sobre",
+  "about.page": "Sobre o NADA Clock e como instalar",
+  "about.suggest": "Sugerir melhoria ou relatar problema (GitHub)",
+  "about.source": "Código-fonte no GitHub",
+  "general.languageEs": "Español"
 };
