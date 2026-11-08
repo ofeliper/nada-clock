@@ -1,6 +1,6 @@
 // Service worker do NADA Clock: guarda o app para funcionar offline.
 // Ao publicar uma nova versão, aumente CACHE_VERSION para os aparelhos baixarem os arquivos novos.
-const CACHE_VERSION = "nada-clock-v0.4.0";
+const CACHE_VERSION = "nada-clock-v0.5.0";
 
 const ASSETS = [
   "./",
@@ -22,6 +22,8 @@ const ASSETS = [
   "./js/timer.js",
   "./js/picker.js",
   "./js/update.js",
+  "./js/pomodoro.js",
+  "./js/location.js",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/apple-touch-icon.png",

@@ -24,22 +24,28 @@
   <!-- Palco: uma "vista" por aba -->
   <main id="stage" class="stage" aria-live="off">
     <div id="shift" class="shift">
-      <!-- Aba Relógio: grade 3x3 -->
-      <div id="grid" class="grid view" data-view="clock">
-        <div class="slot" data-slot="TL"></div>
-        <div class="slot" data-slot="T"></div>
-        <div class="slot" data-slot="TR"></div>
-        <div class="slot" data-slot="L"></div>
-        <div class="slot slot-center" data-slot="C"></div>
-        <div class="slot" data-slot="R"></div>
-        <div class="slot" data-slot="BL"></div>
-        <div class="slot" data-slot="B"></div>
-        <div class="slot" data-slot="BR"></div>
+      <!-- Aba Relógio: bordas + linhas coladas no relógio -->
+      <div id="grid" class="face view" data-view="clock">
+        <div class="row-edge" data-row="edge-top">
+          <div class="slot" data-slot="TL"></div><div class="slot" data-slot="TE"></div><div class="slot" data-slot="TR"></div>
+        </div>
+        <div class="spacer"></div>
+        <div class="row-near" data-row="near-top"><div class="slot" data-slot="T"></div></div>
+        <div class="row-mid" data-row="mid">
+          <div class="slot" data-slot="L"></div><div class="slot slot-center" data-slot="C"></div><div class="slot" data-slot="R"></div>
+        </div>
+        <div class="row-near" data-row="near-bottom"><div class="slot" data-slot="B"></div></div>
+        <div class="spacer"></div>
+        <div class="row-edge" data-row="edge-bottom">
+          <div class="slot" data-slot="BL"></div><div class="slot" data-slot="BE"></div><div class="slot" data-slot="BR"></div>
+        </div>
       </div>
       <!-- Aba Timer -->
       <div id="timer-view" class="tview view" data-view="timer" hidden></div>
       <!-- Aba Cronômetro -->
       <div id="stopwatch-view" class="tview view" data-view="stopwatch" hidden></div>
+      <!-- Aba Pomodoro -->
+      <div id="pomodoro-view" class="tview view" data-view="pomodoro" hidden></div>
     </div>
   </main>
 
@@ -57,10 +63,15 @@
         <path d="M3 13.5a9 9 0 0 0 8 7.4"/><path d="M8.6 18.4l2.4 2.5-2.6 2.1"/>
       </svg>
     </button>
+    <button id="face-button" class="bar-btn" type="button" data-i18n-aria="faceSwap.label" aria-label="Digital/analógico">
+      <svg class="ic-analog" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      <svg class="ic-digital" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="3"/><path d="M7 10v4M10 10v4M14 10v4h3v-4h-3"/></svg>
+    </button>
     <div class="tabs" role="tablist">
-      <button type="button" class="tab" role="tab" data-tab="clock"><span data-i18n="tab.clock">Relógio</span></button>
-      <button type="button" class="tab" role="tab" data-tab="timer"><span data-i18n="tab.timer">Timer</span><i class="tab-dot"></i></button>
-      <button type="button" class="tab" role="tab" data-tab="stopwatch"><span data-i18n="tab.stopwatch">Cronômetro</span><i class="tab-dot"></i></button>
+      <button type="button" class="tab" role="tab" data-tab="clock" data-i18n-aria="tab.clock"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg><span data-i18n="tab.clock">Relógio</span></button>
+      <button type="button" class="tab" role="tab" data-tab="timer" data-i18n-aria="tab.timer"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10M7 21h10M8 3c0 5 8 5 8 9s-8 4-8 9M16 3c0 5-8 5-8 9s8 4 8 9"/></svg><span data-i18n="tab.timer">Timer</span><i class="tab-dot"></i></button>
+      <button type="button" class="tab" role="tab" data-tab="stopwatch" data-i18n-aria="tab.stopwatch"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13.5" r="7.5"/><path d="M12 13.5V9.5M10 2.5h4M18.5 6.5l1.5-1.5"/></svg><span data-i18n="tab.stopwatch">Cronômetro</span><i class="tab-dot"></i></button>
+      <button type="button" class="tab" role="tab" data-tab="pomodoro" data-i18n-aria="tab.pomodoro"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7c-4.4 0-7.5 2.9-7.5 6.6S7.6 21 12 21s7.5-3.7 7.5-7.4S16.4 7 12 7Z"/><path d="M12 7V3.5M12 7c-1.5-1.8-3.5-2.2-5-1.5M12 7c1.5-1.8 3.5-2.2 5-1.5"/></svg><span data-i18n="tab.pomodoro">Pomodoro</span><i class="tab-dot"></i></button>
     </div>
     <button id="settings-button" class="bar-btn" type="button" data-i18n-aria="settings.title" aria-label="Configurações">
       <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">

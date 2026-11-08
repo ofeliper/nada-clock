@@ -1,29 +1,35 @@
 // Painel de configurações.
 import * as store from "./store.js";
 import * as weather from "./weather.js";
+import * as location from "./location.js";
 import { t, LANGUAGES, getLanguage, formatShortTime, formatDate } from "./i18n.js";
 import { THEMES, THEME_ORDER, resolveTheme } from "./themes.js";
-import { SLOT_TYPES, CENTER_TYPES, ZONES, zoneCity } from "./components.js";
+import { SLOT_TYPES, ZONES, zoneCity } from "./components.js";
 import { TOKENS, expand } from "./tokens.js";
 import { SOUNDS, play as playSound, unlock as unlockSound } from "./sound.js";
 import { enhanceSelects, handleSelectTap } from "./picker.js";
 import * as update from "./update.js";
 import * as timers from "./timer.js";
+import * as pomodoro from "./pomodoro.js";
 
-export const VERSION = "0.4.0";
+export const VERSION = "0.5.0";
 
 const DATE_FORMATS = ["auto", "dmy", "mdy", "ymd", "short", "long"];
 const SEPARATORS = ["/", "-", "."];
 const FONTS = ["thin", "regular", "bold", "mono", "rounded"];
-const GRID = ["TL", "T", "TR", "L", "C", "R", "BL", "B", "BR"];
 
 let root, body, onCloseCb, getWakeLockState;
-let asking = false;           // mostrando o aviso "precisamos da localização"
-let selectedSlot = "B";       // posição selecionada no editor do Customizado
+let selectedSlot = "T";       // posição selecionada no editor do Customizado
 let resetArmed = false;       // 1º toque em "Restaurar padrão"
 let resetTimer;
 let suppressRender = false;   // evita redesenhar o painel enquanto a pessoa digita
 let updateStatus = "";        // "", checking, latest, updating, unsupported, error
+let locAsk = false;           // aviso antes de pedir o GPS
+let cityResults = null;       // resultados da busca de cidade
+let cityQuery = "";
+let cityError = "";
+let tempNeedsLocation = false;
+let dragJustEnded = false;
 
 export function initSettings({ onClose, wakeLockState }) {
   root = document.getElementById("settings");
@@ -43,11 +49,16 @@ export function initSettings({ onClose, wakeLockState }) {
   // selects: abrem o seletor próprio (que gira junto com o app)
   body.addEventListener("click", (e) => { if (handleSelectTap(e)) e.stopPropagation(); }, true);
   body.addEventListener("click", onClick);
+  body.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && e.target.id === "city-input") { e.preventDefault(); doCitySearch(); }
+  });
   // os botões de placeholder não tiram o foco do campo de texto (mantém o cursor)
   body.addEventListener("mousedown", (e) => { if (e.target.closest(".chip")) e.preventDefault(); });
+  bindDragAndDrop();
 
   store.subscribe(() => { if (isOpen() && !suppressRender) render(); });
   weather.subscribe(() => { if (isOpen()) render(); });
+  location.subscribe(() => { if (isOpen()) render(); });
 }
 
 export function isOpen() {
@@ -55,16 +66,18 @@ export function isOpen() {
 }
 
 export function open() {
-  asking = false;
   resetArmed = false;
   updateStatus = "";
+  locAsk = false;
+  cityResults = null;
+  cityError = "";
+  tempNeedsLocation = false;
   root.hidden = false;
   render();
 }
 
 export function close() {
   root.hidden = true;
-  asking = false;
   onCloseCb?.();
 }
 
@@ -86,6 +99,7 @@ function render() {
         <button type="button" data-action="face" data-value="minimal" aria-pressed="${!custom}">${t("face.minimal")}</button>
         <button type="button" data-action="face" data-value="custom" aria-pressed="${custom}">${t("face.custom")}</button>
       </div>
+      <div class="row"><span class="row-label"><span class="row-hint">${t(custom ? "face.customHint" : "face.minimalHint")}</span></span></div>
       <div class="swatches" role="group" aria-label="${t("theme.label")}">
         ${THEME_ORDER.map((th) => swatch(th, s.theme === th)).join("")}
       </div>
@@ -96,17 +110,26 @@ function render() {
       ], s.rotateDir) : ""}
     `)}
 
-    ${custom ? centerSection(s) + slotsSection(s) + colorsSection(s) : ""}
+    ${group(t("group.clock"), clockSection(s))}
+
+    ${custom ? slotsSection(s) + presetsSection(s) + colorsSection(s) : ""}
 
     ${group(t("group.info"), `
       ${!custom ? switchRow("showWeekday", t("info.weekday"), s.showWeekday) : ""}
       ${!custom ? switchRow("showDate", t("info.date"), s.showDate) : ""}
-      ${custom || s.showDate ? dateFormatRows(s, lang) : ""}
+      ${!custom ? selectRow("infoPosition", t("info.position"), [
+        { value: "top", label: t("info.above") }, { value: "bottom", label: t("info.below") },
+      ], s.infoPosition) : ""}
+      ${dateFormatRows(s)}
     `)}
 
-    ${group(t("group.sounds"), soundsSection(s))}
+    ${group(t("group.location"), locationSection(s))}
 
     ${group(t("group.temperature"), temperatureSection(s, lang))}
+
+    ${group(t("group.pomodoro"), pomodoroSection(s))}
+
+    ${group(t("group.sounds"), soundsSection(s))}
 
     ${group(t("group.night"), `
       ${switchRow("nightEnabled", t("night.enabled"), s.nightEnabled, t("night.hint"))}
@@ -166,7 +189,7 @@ function swatch(th, pressed) {
     </button>`;
 }
 
-function dateFormatRows(s, lang) {
+function dateFormatRows(s) {
   const sample = new Date(2026, 10, 8);
   return `
     ${selectRow("dateFormat", t("info.dateFormat"), DATE_FORMATS.map((f) => ({
@@ -179,50 +202,54 @@ function dateFormatRows(s, lang) {
       SEPARATORS.map((x) => ({ value: x, label: x })), s.dateSeparator) : ""}`;
 }
 
-// ---------- Customizado: centro ----------
-function centerSection(s) {
-  const c = s.custom.center;
-  let rows = selectRow(null, t("center.type"), CENTER_TYPES.map((x) => ({ value: x, label: t("center." + x) })), c.type, 'data-center="type"');
+// ---------- Relógio (vale para os dois mostradores) ----------
+function clockSection(s) {
+  const c = s.clock;
+  let rows = `
+    <div class="segmented" role="group" aria-label="${t("center.type")}">
+      <button type="button" data-action="clock-type" data-value="digital" aria-pressed="${c.type === "digital"}">${t("center.digital")}</button>
+      <button type="button" data-action="clock-type" data-value="analog" aria-pressed="${c.type === "analog"}">${t("center.analog")}</button>
+    </div>
+    <div class="row"><span class="row-label"><span class="row-hint">${t("clock.swapHint")}</span></span></div>`;
   if (c.type === "digital") {
-    rows += switchRow(null, t("center.hour12"), c.hour12, "", 'data-center="hour12"');
-    rows += switchRow(null, t("center.seconds"), c.seconds, "", 'data-center="seconds"');
-    rows += switchRow(null, t("center.blink"), c.blink, "", 'data-center="blink"');
-    rows += selectRow(null, t("center.font"), FONTS.map((f) => ({ value: f, label: t("font." + f) })), c.font, 'data-center="font"');
-  } else if (c.type === "analog") {
-    rows += switchRow(null, t("center.analogHourNumbers"), c.analogHourNumbers, "", 'data-center="analogHourNumbers"');
-    rows += switchRow(null, t("center.analogMinuteNumbers"), c.analogMinuteNumbers, "", 'data-center="analogMinuteNumbers"');
-    rows += switchRow(null, t("center.analogMinuteTicks"), c.analogMinuteTicks, "", 'data-center="analogMinuteTicks"');
-    rows += switchRow(null, t("center.analogSeconds"), c.analogSeconds, "", 'data-center="analogSeconds"');
-    if (c.analogSeconds) rows += switchRow(null, t("center.analogSmooth"), c.analogSmooth, t("center.analogSmoothHint"), 'data-center="analogSmooth"');
-  } else if (c.type === "text") {
-    rows += textEditor("center-text", c.text, 'data-center="text"');
+    rows += switchRow(null, t("center.hour12"), c.hour12, "", 'data-clock="hour12"');
+    rows += switchRow(null, t("center.seconds"), c.seconds, "", 'data-clock="seconds"');
+    rows += switchRow(null, t("center.blink"), c.blink, "", 'data-clock="blink"');
+    rows += selectRow(null, t("center.font"), FONTS.map((f) => ({ value: f, label: t("font." + f) })), c.font, 'data-clock="font"');
+  } else {
+    rows += switchRow(null, t("center.analogHourNumbers"), c.analogHourNumbers, "", 'data-clock="analogHourNumbers"');
+    rows += switchRow(null, t("center.analogMinuteNumbers"), c.analogMinuteNumbers, "", 'data-clock="analogMinuteNumbers"');
+    rows += switchRow(null, t("center.analogMinuteTicks"), c.analogMinuteTicks, "", 'data-clock="analogMinuteTicks"');
+    rows += switchRow(null, t("center.analogSeconds"), c.analogSeconds, "", 'data-clock="analogSeconds"');
+    if (c.analogSeconds) rows += switchRow(null, t("center.analogSmooth"), c.analogSmooth, t("center.analogSmoothHint"), 'data-clock="analogSmooth"');
   }
-  return group(t("group.center"), rows);
+  return rows;
 }
 
 // ---------- Customizado: posições ----------
 function slotLabel(id, s) {
-  if (id === "C") return t("comp." + (s.custom.center.type === "text" ? "text" : s.custom.center.type));
+  if (id === s.custom.clockSlot) return "🕐 " + t("comp.clock");
   const type = s.custom.slots[id]?.type || "empty";
   return type === "empty" ? "—" : t("comp." + type);
 }
 
 function slotsSection(s) {
-  if (selectedSlot === "C") selectedSlot = "B";
   const grid = `
     <div class="slot-grid" role="group" aria-label="${t("group.slots")}">
-      ${GRID.map((id) => {
-        const filled = id === "C" || (s.custom.slots[id] && s.custom.slots[id].type !== "empty");
-        const disabled = id === "C";
-        return `<button type="button" data-action="slot" data-value="${id}" ${disabled ? "disabled" : ""}
-          class="${filled ? "filled" : ""}" aria-pressed="${id === selectedSlot}">${slotLabel(id, s)}</button>`;
+      ${store.SLOTS.map((id) => {
+        const isClock = id === s.custom.clockSlot;
+        const filled = isClock || (s.custom.slots[id] && s.custom.slots[id].type !== "empty");
+        return `<button type="button" data-action="slot" data-value="${id}" style="grid-area:${id}"
+          class="${filled ? "filled" : ""} ${isClock ? "has-clock" : ""}" aria-pressed="${id === selectedSlot}">${slotLabel(id, s)}</button>`;
       }).join("")}
     </div>`;
 
+  const isClock = selectedSlot === s.custom.clockSlot;
   const cfg = s.custom.slots[selectedSlot] || { type: "empty" };
-  let rows = selectRow(null, t("slots.component"), SLOT_TYPES.map((x) => ({ value: x, label: t("comp." + x) })), cfg.type, "data-slottype");
+  const options = [{ value: "__clock", label: "🕐 " + t("comp.clock") }, ...SLOT_TYPES.map((x) => ({ value: x, label: t("comp." + x) }))];
+  let rows = selectRow(null, t("slots.component"), options, isClock ? "__clock" : cfg.type, "data-slottype");
 
-  switch (cfg.type) {
+  if (!isClock) switch (cfg.type) {
     case "timezone":
       rows += selectRow(null, t("tz.zone"), ZONES.map((z) => ({ value: z, label: zoneCity(z) })), cfg.zone, 'data-slotfield="zone"');
       rows += inputRow(t("tz.label"), cfg.label || "", t("tz.labelPlaceholder"), 'data-slotfield="label"');
@@ -242,12 +269,15 @@ function slotsSection(s) {
       rows += textEditor("slot-text", cfg.text || "", 'data-slotfield="text"');
       break;
     case "temperature":
-      if (!s.tempEnabled) rows += `<div class="row"><span class="row-label"><span class="row-hint warn">${t("comp.tempOff")}</span></span></div>`;
+      if (!s.tempEnabled) rows += hintRow(t("comp.tempOff"), true);
+      break;
+    case "sun":
+      if (!location.hasLocation()) rows += hintRow(t("comp.needsLocation"), true);
       break;
   }
 
   return group(t("group.slots"), `
-    <div class="row"><span class="row-label"><span class="row-hint">${t("slots.hint")}</span></span></div>
+    ${hintRow(t("slots.hint"))}
     ${grid}
     ${rows}`);
 }
@@ -263,6 +293,29 @@ function textEditor(id, value, attr) {
     </div>`;
 }
 
+// ---------- Customizado: presets ----------
+function presetsSection(s) {
+  let rows = `
+    <div class="row">
+      <span class="preset-save">
+        <input type="text" class="field-input" id="preset-name" maxlength="40" placeholder="${esc(t("presets.namePlaceholder"))}" autocomplete="off">
+        <button type="button" class="btn primary" data-action="preset-save">${t("presets.save")}</button>
+      </span>
+    </div>`;
+  if (!s.presets.length) rows += hintRow(t("presets.empty"));
+  for (const p of s.presets) {
+    rows += `
+      <div class="row preset-row">
+        <span class="row-label">${esc(p.name)}</span>
+        <span class="preset-actions">
+          <button type="button" class="btn" data-action="preset-apply" data-value="${esc(p.id)}">${t("presets.apply")}</button>
+          <button type="button" class="btn icon-btn" data-action="preset-delete" data-value="${esc(p.id)}" aria-label="${esc(t("presets.delete"))}">✕</button>
+        </span>
+      </div>`;
+  }
+  return group(t("group.presets"), rows);
+}
+
 // ---------- Customizado: cores ----------
 function colorsSection(s) {
   const col = s.custom.colors;
@@ -274,6 +327,127 @@ function colorsSection(s) {
     rows += `<div class="row"><span class="row-label"></span><button type="button" class="btn" data-action="match-main">${t("colors.matchMain")}</button></div>`;
   }
   return group(t("group.colors"), rows);
+}
+
+// ---------- Localização ----------
+function serviceLink(svc) {
+  return `<a href="${svc.url}" target="_blank" rel="noopener noreferrer">${esc(svc.name)}</a>`;
+}
+
+function locationSection(s) {
+  const loc = s.location;
+  const st = location.getStatus();
+  const mode = loc.mode || "none";
+  let rows = selectRow(null, t("loc.source"), [
+    { value: "none", label: t("loc.none") },
+    { value: "gps", label: t("loc.gps") },
+    { value: "ip", label: t("loc.ip") },
+    { value: "city", label: t("loc.city") },
+  ], locAsk ? "gps" : mode, "data-locmode");
+
+  if (locAsk) {
+    rows += `<p class="notice"><strong>${t("temp.askTitle")}</strong><br>${t("loc.gpsAsk")}
+      <span class="notice-actions">
+        <button type="button" class="btn primary" data-action="gps-allow">${t("temp.allow")}</button>
+        <button type="button" class="btn" data-action="gps-cancel">${t("temp.cancel")}</button>
+      </span></p>`;
+  } else if (st === "denied") {
+    rows += `<p class="notice"><strong>${t("temp.denied")}</strong><br>${t("temp.deniedHelp")}<br>${t("loc.deniedAlt")}
+      <span class="notice-actions wrap">
+        <button type="button" class="btn primary" data-action="gps-allow">${t("temp.retry")}</button>
+        <button type="button" class="btn" data-action="loc-ip">${t("loc.ip")}</button>
+        <button type="button" class="btn" data-action="loc-city">${t("loc.city")}</button>
+      </span></p>`;
+  }
+
+  if (mode === "city" || (cityResults && !locAsk)) {
+    rows += `
+      <div class="row">
+        <span class="preset-save">
+          <input type="search" class="field-input" id="city-input" value="${esc(cityQuery)}" placeholder="${esc(t("loc.cityPlaceholder"))}" autocomplete="off" enterkeyhint="search">
+          <button type="button" class="btn" data-action="city-search">${t("loc.search")}</button>
+        </span>
+      </div>`;
+    if (cityError) rows += hintRow(cityError, true);
+    if (cityResults) {
+      rows += cityResults.length
+        ? `<div class="loc-results">${cityResults.map((r, i) => `<button type="button" data-action="city-pick" data-value="${i}">${esc(r.name)}</button>`).join("")}</div>`
+        : hintRow(t("loc.noResults"));
+    }
+  }
+
+  // status atual
+  let status;
+  if (st === "locating") status = t("loc.locating");
+  else if (st === "error") status = `<span class="warn-text">${t("loc.error")}</span>`;
+  else if (location.hasLocation()) {
+    const where = loc.name || `${loc.lat.toFixed(2)}, ${loc.lon.toFixed(2)}`;
+    status = t("loc.current", { where: esc(where) }) + (loc.mode === "ip" ? ` · ${t("loc.approx")}` : "");
+  } else status = t("loc.notSet");
+  rows += `
+    <div class="row">
+      <span class="row-label"><span class="row-hint">${status}</span></span>
+      ${loc.mode === "gps" || loc.mode === "ip" ? `<button type="button" class="btn" data-action="loc-refresh">${t("loc.refresh")}</button>` : ""}
+    </div>`;
+  if (loc.mode === "ip") rows += hintRow(t("loc.ipHint"));
+
+  // transparência: quais serviços são usados
+  rows += `
+    <div class="row"><span class="row-label"><span class="source-note">
+      ${t("loc.usedFor")}<br>
+      ${t("loc.services")}: ${serviceLink(location.SERVICES.ip)} (${t("loc.svcIp")}) · ${serviceLink(location.SERVICES.geocoding)} (${t("loc.svcCity")})
+    </span></span></div>`;
+  return rows;
+}
+
+// ---------- Temperatura ----------
+function temperatureSection(s, lang) {
+  const status = weather.getStatus();
+  const unit = s.tempUnit || LANGUAGES[lang].defaults.tempUnit;
+  const cache = store.getWeatherCache();
+  let rows = switchRow("tempEnabled", t("temp.show"), s.tempEnabled);
+
+  if (tempNeedsLocation && !location.hasLocation()) {
+    rows += `<p class="notice"><strong>${t("temp.needsLocation")}</strong><br>${t("temp.needsLocationBody")}
+      <span class="notice-actions wrap">
+        <button type="button" class="btn primary" data-action="loc-gps">${t("loc.gps")}</button>
+        <button type="button" class="btn" data-action="loc-ip">${t("loc.ip")}</button>
+        <button type="button" class="btn" data-action="loc-city">${t("loc.city")}</button>
+      </span></p>`;
+  }
+
+  if (s.tempEnabled) {
+    let hint;
+    if (status === "updating") hint = t("temp.updating");
+    else if (status === "nolocation") hint = `<span class="warn-text">${t("temp.needsLocation")}</span>`;
+    else if (cache?.updatedAt) hint = t("temp.lastUpdate", { time: formatShortTime(new Date(cache.updatedAt)) });
+    else hint = t("temp.never");
+    const errorHint = status === "error" ? `<span class="row-hint warn">${t("temp.error")}</span>` : "";
+    rows += selectRow("tempUnit", t("temp.unit"), [{ value: "C", label: "°C" }, { value: "F", label: "°F" }], unit);
+    rows += `
+      <div class="row">
+        <span class="row-label"><span class="row-hint">${hint}</span>${errorHint}</span>
+        <button type="button" class="btn" data-action="temp-refresh">${t("temp.refresh")}</button>
+      </div>`;
+  }
+  rows += `<div class="row"><span class="row-label"><span class="source-note">
+    ${t("temp.source")} ${serviceLink(location.SERVICES.weather)} · ${t("temp.license")}
+  </span></span></div>`;
+  return rows;
+}
+
+// ---------- Pomodoro ----------
+function pomodoroSection(s) {
+  const p = s.pomo;
+  const range = (a, b, step) => Array.from({ length: Math.floor((b - a) / step) + 1 }, (_, i) => a + i * step);
+  const mins = (arr) => arr.map((n) => ({ value: n, label: `${n} min` }));
+  return `
+    ${selectRow(null, t("pomo.focus"), mins([10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 90]), p.focus, 'data-pomo="focus"')}
+    ${selectRow(null, t("pomo.short"), mins(range(1, 15, 1)), p.short, 'data-pomo="short"')}
+    ${selectRow(null, t("pomo.long"), mins(range(5, 45, 5)), p.long, 'data-pomo="long"')}
+    ${selectRow(null, t("pomo.cycles"), range(2, 8, 1).map((n) => ({ value: n, label: String(n) })), p.cycles, 'data-pomo="cycles"')}
+    ${switchRow(null, t("pomo.autoStart"), p.autoStart, t("pomo.autoStartHint"), 'data-pomo="autoStart"')}
+  `;
 }
 
 // ---------- Sons ----------
@@ -316,53 +490,8 @@ function soundsSection(s) {
   rows += `<div class="row"><span class="row-label">${t("sounds.volume")}</span>
     <input type="range" class="range" data-sound="volume" min="0" max="1" step="0.05" value="${so.volume}"></div>`;
   rows += switchRow(null, t("sounds.muteAtNight"), so.muteAtNight, "", 'data-sound="muteAtNight"');
-  rows += `<div class="row"><span class="row-label"><span class="row-hint">${t("sounds.hint")}</span></span></div>`;
+  rows += hintRow(t("sounds.hint"));
   return rows;
-}
-
-// ---------- Temperatura ----------
-function temperatureSection(s, lang) {
-  const status = weather.getStatus();
-
-  if (!weather.supported || status === "unsupported") {
-    return `<div class="row"><span class="row-label"><span class="row-hint">${t("temp.unsupported")}</span></span></div>`;
-  }
-
-  if (status === "denied") {
-    return `
-      <p class="notice"><strong>${t("temp.denied")}</strong><br>${t("temp.deniedHelp")}
-        <span class="notice-actions"><button type="button" class="btn primary" data-action="temp-allow">${t("temp.retry")}</button></span>
-      </p>`;
-  }
-
-  if (asking) {
-    return `
-      ${switchRow("tempEnabled", t("temp.show"), true)}
-      <p class="notice"><strong>${t("temp.askTitle")}</strong><br>${t("temp.askBody")}
-        <span class="notice-actions">
-          <button type="button" class="btn primary" data-action="temp-allow">${t("temp.allow")}</button>
-          <button type="button" class="btn" data-action="temp-cancel">${t("temp.cancel")}</button>
-        </span>
-      </p>`;
-  }
-
-  const unit = s.tempUnit || LANGUAGES[lang].defaults.tempUnit;
-  const cache = store.getWeatherCache();
-  let hint;
-  if (status === "locating" || status === "updating") hint = t("temp.updating");
-  else if (cache?.updatedAt) hint = t("temp.lastUpdate", { time: formatShortTime(new Date(cache.updatedAt)) });
-  else hint = t("temp.never");
-  const errorHint = status === "error" ? `<span class="row-hint warn">${t("temp.error")}</span>` : "";
-
-  return `
-    ${switchRow("tempEnabled", t("temp.show"), s.tempEnabled || status === "locating")}
-    ${s.tempEnabled ? `
-      ${selectRow("tempUnit", t("temp.unit"), [{ value: "C", label: "°C" }, { value: "F", label: "°F" }], unit)}
-      <div class="row">
-        <span class="row-label"><span class="row-hint">${hint}</span>${errorHint}</span>
-        <button type="button" class="btn" data-action="temp-refresh">${t("temp.refresh")}</button>
-      </div>` : ""}
-  `;
 }
 
 function wakeLockText() {
@@ -380,6 +509,10 @@ function esc(str) {
 
 function group(title, inner) {
   return `<div class="group"><h3 class="group-title">${title}</h3><div class="card">${inner}</div></div>`;
+}
+
+function hintRow(text, warn = false) {
+  return `<div class="row"><span class="row-label"><span class="row-hint ${warn ? "warn" : ""}">${text}</span></span></div>`;
 }
 
 function switchRow(key, label, checked, hint, attr = "") {
@@ -435,6 +568,51 @@ function inputRow(label, value, placeholder, attr) {
     </label>`;
 }
 
+// ---------------- Arrastar e soltar (mini-grade) ----------------
+// Eventos de ponteiro (funcionam com toque no iPhone). O alvo é encontrado por elementFromPoint,
+// que respeita o giro do app via CSS.
+function bindDragAndDrop() {
+  let drag = null;
+  body.addEventListener("pointerdown", (e) => {
+    const b = e.target.closest(".slot-grid button");
+    if (!b || e.button > 0) return;
+    drag = { id: b.dataset.value, el: b, x: e.clientX, y: e.clientY, active: false, target: null, pid: e.pointerId };
+  });
+  body.addEventListener("pointermove", (e) => {
+    if (!drag || e.pointerId !== drag.pid) return;
+    if (!drag.active) {
+      if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 8) return;
+      drag.active = true;
+      drag.el.classList.add("dragging");
+      try { drag.el.setPointerCapture(e.pointerId); } catch { /* ok */ }
+    }
+    e.preventDefault();
+    const under = document.elementFromPoint(e.clientX, e.clientY)?.closest(".slot-grid button");
+    const target = under && under !== drag.el ? under : null;
+    if (target !== drag.target) {
+      drag.target?.classList.remove("drop-target");
+      target?.classList.add("drop-target");
+      drag.target = target;
+    }
+  });
+  const end = (e) => {
+    if (!drag || e.pointerId !== drag.pid) return;
+    const d = drag;
+    drag = null;
+    if (!d.active) return;
+    d.el.classList.remove("dragging");
+    d.target?.classList.remove("drop-target");
+    dragJustEnded = true;
+    setTimeout(() => { dragJustEnded = false; }, 50);
+    if (d.target && e.type === "pointerup") {
+      selectedSlot = d.target.dataset.value;
+      store.swapSlots(d.id, d.target.dataset.value);
+    }
+  };
+  body.addEventListener("pointerup", end);
+  body.addEventListener("pointercancel", end);
+}
+
 // ---------------- Eventos ----------------
 
 const SLOT_DEFAULTS = {
@@ -466,13 +644,16 @@ function applyField(el, live) {
       if (d.sound === "volume") v = Number(value);
       if (d.sound === "customValue") v = Math.max(0, Math.min(720, Math.round(Number(value) || 0)));
       store.setSounds({ [d.sound]: v });
+    } else if ("clock" in d) {
+      store.setClock({ [d.clock]: value });
+    } else if ("pomo" in d) {
+      store.setPomo({ [d.pomo]: typeof value === "boolean" ? value : Number(value) });
     } else if ("timeKey" in d) {
       const p2 = (n) => String(n).padStart(2, "0");
       const [h, m] = String(store.get()[d.timeKey] || "00:00").split(":");
       const next = d.part === "h" ? `${p2(value)}:${m}` : `${h}:${p2(value)}`;
       store.set({ [d.timeKey]: next });
     } else if ("orientation" in d) store.set({ orientation: value ? "landscape" : "auto" });
-    else if ("center" in d) store.setCustom("center", { [d.center]: value });
     else if ("color" in d) {
       if (d.color === "enabled" && value) {
         // ao ligar, começa com as cores da paleta atual
@@ -485,7 +666,17 @@ function applyField(el, live) {
       const cfg = store.get().custom.slots[selectedSlot] || { type: "empty" };
       store.setSlot(selectedSlot, { ...cfg, [d.slotfield]: value });
     } else if ("slottype" in d) {
-      store.setSlot(selectedSlot, { type: value, ...(SLOT_DEFAULTS[value]?.() || {}) });
+      if (value === "__clock") store.moveClock(selectedSlot);
+      else if (selectedSlot === store.get().custom.clockSlot) {
+        // o relógio estava aqui: ele volta para o centro (ou troca com o centro)
+        const target = selectedSlot === "C" ? "T" : "C";
+        store.moveClock(target);
+        store.setSlot(selectedSlot, { type: value, ...(SLOT_DEFAULTS[value]?.() || {}) });
+      } else {
+        store.setSlot(selectedSlot, { type: value, ...(SLOT_DEFAULTS[value]?.() || {}) });
+      }
+    } else if ("locmode" in d) {
+      onLocationMode(value);
     } else if (d.key) {
       store.set({ [d.key]: value });
     }
@@ -499,20 +690,48 @@ function applyField(el, live) {
   }
 }
 
+async function onLocationMode(mode) {
+  cityResults = null;
+  cityError = "";
+  if (mode === "none") { locAsk = false; location.clear(); return; }
+  if (mode === "gps") {
+    if (await location.gpsPermissionGranted()) { locAsk = false; location.useGPS(); }
+    else { locAsk = true; render(); }
+    return;
+  }
+  locAsk = false;
+  if (mode === "ip") { location.useIP(); render(); }
+  if (mode === "city") { cityResults = []; render(); setTimeout(() => body.querySelector("#city-input")?.focus(), 50); }
+}
+
+async function doCitySearch() {
+  const input = body.querySelector("#city-input");
+  cityQuery = input?.value || "";
+  cityError = "";
+  try {
+    cityResults = await location.searchCity(cityQuery);
+  } catch {
+    cityResults = null;
+    cityError = t("loc.searchError");
+  }
+  render();
+}
+
 function onInput(e) {
+  if (e.target.id === "city-input") { cityQuery = e.target.value; return; }
   applyField(e.target, true);
 }
 
 async function onChange(e) {
   const el = e.target;
+  if (el.id === "city-input" || el.id === "preset-name") return;
 
   if (el.dataset.key === "tempEnabled") {
     if (el.checked) {
-      // Se a permissão já foi dada antes, não precisa do aviso.
-      if (await permissionGranted()) { weather.enable(); }
-      else { asking = true; render(); }
+      if (location.hasLocation()) { tempNeedsLocation = false; weather.enable(); }
+      else { tempNeedsLocation = true; store.set({ tempEnabled: true }); }
     } else {
-      asking = false;
+      tempNeedsLocation = false;
       weather.disable();
     }
     return;
@@ -529,63 +748,84 @@ function onClick(e) {
   if (!btn) return;
   const { action, value } = btn.dataset;
 
-  if (action === "theme") store.set({ theme: value });
-  if (action === "update-check") {
-    updateStatus = "checking";
-    render();
-    update.checkNow().then((r) => { updateStatus = r; refresh(); });
-  }
-  if (action === "update-force") update.forceReload();
-  if (action === "sound-test") {
-    unlockSound();
-    const so = store.get().sounds;
-    playSound(so[value], so.volume);
-  }
-  if (action === "face") store.set({ face: value });
-  if (action === "slot") { selectedSlot = value; render(); }
-  if (action === "temp-allow") { asking = false; weather.enable(); render(); }
-  if (action === "temp-cancel") { asking = false; render(); }
-  if (action === "temp-refresh") weather.refreshNow();
+  switch (action) {
+    case "theme": store.set({ theme: value }); break;
+    case "face": store.set({ face: value }); break;
+    case "clock-type": store.setClock({ type: value }); break;
+    case "slot": if (!dragJustEnded) { selectedSlot = value; render(); } break;
 
-  if (action === "token") {
-    const input = document.getElementById(btn.dataset.target);
-    if (!input) return;
-    const start = input.selectionStart ?? input.value.length;
-    const end = input.selectionEnd ?? input.value.length;
-    input.value = input.value.slice(0, start) + value + input.value.slice(end);
-    const pos = start + value.length;
-    input.focus();
-    try { input.setSelectionRange(pos, pos); } catch { /* ok */ }
-    applyField(input, true);
-  }
-
-  if (action === "match-main") {
-    const fg = store.get().custom.colors.fg;
-    store.setCustom("colors", { hours: fg, minutes: fg, seconds: fg });
-  }
-
-  if (action === "reset") {
-    if (!resetArmed) {
-      resetArmed = true;
+    case "update-check":
+      updateStatus = "checking";
       render();
-      clearTimeout(resetTimer);
-      resetTimer = setTimeout(() => { resetArmed = false; refresh(); }, 4000);
-    } else {
-      resetArmed = false;
-      clearTimeout(resetTimer);
-      selectedSlot = "B";
-      weather.disable();
-      timers.reset();
-      store.reset();
-    }
-  }
-}
+      update.checkNow().then((r) => { updateStatus = r; refresh(); });
+      break;
+    case "update-force": update.forceReload(); break;
 
-async function permissionGranted() {
-  try {
-    const p = await navigator.permissions?.query({ name: "geolocation" });
-    return p?.state === "granted";
-  } catch {
-    return false;
+    case "sound-test": {
+      unlockSound();
+      const so = store.get().sounds;
+      playSound(so[value], so.volume);
+      break;
+    }
+
+    // localização
+    case "gps-allow": locAsk = false; location.useGPS(); render(); break;
+    case "gps-cancel": locAsk = false; render(); break;
+    case "loc-gps": onLocationMode("gps"); break;
+    case "loc-ip": onLocationMode("ip"); break;
+    case "loc-city": onLocationMode("city"); break;
+    case "loc-refresh": location.refreshNow(); break;
+    case "city-search": doCitySearch(); break;
+    case "city-pick": {
+      const r = cityResults?.[Number(value)];
+      if (r) { location.useCity(r); cityResults = null; cityQuery = ""; }
+      break;
+    }
+    case "temp-refresh": weather.refreshNow(); break;
+
+    // presets
+    case "preset-save": {
+      const name = body.querySelector("#preset-name")?.value;
+      store.savePreset(name || `${t("presets.default")} ${store.get().presets.length + 1}`);
+      break;
+    }
+    case "preset-apply": store.applyPreset(value); break;
+    case "preset-delete": store.deletePreset(value); break;
+
+    case "token": {
+      const input = document.getElementById(btn.dataset.target);
+      if (!input) return;
+      const start = input.selectionStart ?? input.value.length;
+      const end = input.selectionEnd ?? input.value.length;
+      input.value = input.value.slice(0, start) + value + input.value.slice(end);
+      const pos = start + value.length;
+      input.focus();
+      try { input.setSelectionRange(pos, pos); } catch { /* ok */ }
+      applyField(input, true);
+      break;
+    }
+
+    case "match-main": {
+      const fg = store.get().custom.colors.fg;
+      store.setCustom("colors", { hours: fg, minutes: fg, seconds: fg });
+      break;
+    }
+
+    case "reset":
+      if (!resetArmed) {
+        resetArmed = true;
+        render();
+        clearTimeout(resetTimer);
+        resetTimer = setTimeout(() => { resetArmed = false; refresh(); }, 4000);
+      } else {
+        resetArmed = false;
+        clearTimeout(resetTimer);
+        selectedSlot = "T";
+        weather.disable();
+        timers.reset();
+        pomodoro.reset();
+        store.reset();
+      }
+      break;
   }
 }

@@ -187,7 +187,7 @@ export const zoneCity = (zone) => (zone === "UTC" ? "UTC" : zone.split("/").pop(
 
 export function timezone(opts = {}) {
   const zone = opts.zone || "Europe/Lisbon";
-  const hour12 = !!store.get().custom.center.hour12;
+  const hour12 = !!store.get().clock.hour12;
   let fmt;
   try {
     fmt = new Intl.DateTimeFormat("en-GB", { timeZone: zone, hour: "2-digit", minute: "2-digit", hour12 });
@@ -250,7 +250,7 @@ function phaseName(p) {
 function southern(opts) {
   if (opts.hemisphere === "north") return false;
   if (opts.hemisphere === "south") return true;
-  const lat = store.getWeatherCache()?.lat;
+  const lat = store.get().location?.lat;
   if (typeof lat === "number") return lat < 0;
   return getLanguage() === "pt-BR";
 }
@@ -303,15 +303,55 @@ export function countdown(opts = {}) {
   });
 }
 
-// ---------------- Catálogo ----------------
-/** Componentes disponíveis para os slots laterais (ordem = ordem no editor). */
-export const SLOT_TYPES = ["empty", "weekdayDate", "weekday", "date", "temperature", "timezone", "progress", "moon", "countdown", "text"];
+// ---------------- Nascer e pôr do sol ----------------
+// Calculado localmente (equação do nascer do sol / NOAA simplificada) a partir da localização.
+const RAD = Math.PI / 180;
 
-/** Tipos disponíveis para o centro. */
-export const CENTER_TYPES = ["digital", "analog", "text"];
+export function sunTimes(date, lat, lon) {
+  // dia juliano do meio-dia UTC da data do calendário local
+  const jd = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), 12) / 86400000 + 2440587.5;
+  const n = Math.round(jd - 2451545.0 + 0.0008);
+  const jStar = n - lon / 360;
+  const M = (357.5291 + 0.98560028 * jStar) % 360;
+  const C = 1.9148 * Math.sin(M * RAD) + 0.02 * Math.sin(2 * M * RAD) + 0.0003 * Math.sin(3 * M * RAD);
+  const lambda = (M + C + 180 + 102.9372) % 360;
+  const jTransit = 2451545.0 + jStar + 0.0053 * Math.sin(M * RAD) - 0.0069 * Math.sin(2 * lambda * RAD);
+  const sinDec = Math.sin(lambda * RAD) * Math.sin(23.4397 * RAD);
+  const cosDec = Math.cos(Math.asin(sinDec));
+  const cosW = (Math.sin(-0.833 * RAD) - Math.sin(lat * RAD) * sinDec) / (Math.cos(lat * RAD) * cosDec);
+  if (cosW > 1) return { polar: "night" };
+  if (cosW < -1) return { polar: "day" };
+  const w = Math.acos(cosW) / RAD;
+  const toDate = (j) => new Date((j - 2440587.5) * 86400000);
+  return { rise: toDate(jTransit - w / 360), set: toDate(jTransit + w / 360) };
+}
+
+const SUN_UP = '<svg class="sun-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18h16M7 18a5 5 0 0 1 10 0M12 4v5M9.5 6.5 12 4l2.5 2.5"/></svg>';
+const SUN_DOWN = '<svg class="sun-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18h16M7 18a5 5 0 0 1 10 0M12 9V4M9.5 6.5 12 9l2.5-2.5"/></svg>';
+
+export function sun() {
+  let cacheKey = "", cacheHtml = "";
+  return textComponent((now) => {
+    const loc = store.get().location;
+    if (typeof loc?.lat !== "number") return "";
+    const key = `${now.toDateString()}|${loc.lat}|${loc.lon}|${store.get().clock.hour12}`;
+    if (key === cacheKey) return cacheHtml;
+    cacheKey = key;
+    const st = sunTimes(now, loc.lat, loc.lon);
+    const h12 = !!store.get().clock.hour12;
+    const fmt = (d) => d.toLocaleTimeString(h12 ? "en-US" : "pt-BR", { hour: "2-digit", minute: "2-digit", hour12: h12 });
+    cacheHtml = st.polar ? esc(t(st.polar === "day" ? "sun.polarDay" : "sun.polarNight"))
+      : `<span class="sun">${SUN_UP}${esc(fmt(st.rise))}</span><span class="dot">·</span><span class="sun">${SUN_DOWN}${esc(fmt(st.set))}</span>`;
+    return cacheHtml;
+  });
+}
+
+// ---------------- Catálogo ----------------
+/** Componentes disponíveis para as posições (ordem = ordem no editor). */
+export const SLOT_TYPES = ["empty", "weekdayDate", "weekday", "date", "temperature", "timezone", "progress", "moon", "sun", "countdown", "text"];
 
 export function createSlotComponent(cfg = {}) {
-  switch (cfg.type) {
+  switch (cfg?.type) {
     case "weekdayDate": return weekdayDate();
     case "weekday": return weekday();
     case "date": return date();
@@ -319,17 +359,18 @@ export function createSlotComponent(cfg = {}) {
     case "timezone": return timezone(cfg);
     case "progress": return progress(cfg);
     case "moon": return moon(cfg);
+    case "sun": return sun();
     case "countdown": return countdown(cfg);
     case "text": return freeText(cfg);
     default: return null;
   }
 }
 
-export function createCenterComponent(c = {}) {
+/** Relógio (digital ou analógico) com as opções compartilhadas. */
+export function createClock(c = {}) {
   if (c.type === "analog") return clockAnalog({
     seconds: c.analogSeconds, smooth: c.analogSmooth,
     hourNumbers: c.analogHourNumbers, minuteNumbers: c.analogMinuteNumbers, minuteTicks: c.analogMinuteTicks,
   });
-  if (c.type === "text") return freeText({ text: c.text }, true);
   return clockDigital(c);
 }

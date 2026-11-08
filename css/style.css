@@ -129,7 +129,7 @@ body {
   position: fixed;
   inset: 0;
   padding:
-    max(var(--sa-top), 8px)
+    calc(max(var(--sa-top), 8px) + var(--top-band, 0px))
     max(var(--sa-right), 8px)
     max(var(--sa-bottom), 8px)
     max(var(--sa-left), 8px);
@@ -140,7 +140,9 @@ body {
 
 /* No vertical, afasta a linha de cima da barra de status (o iOS escurece essa faixa) */
 @media (orientation: portrait) {
-  html:not(.rot-cw):not(.rot-ccw) .stage { padding-top: calc(max(var(--sa-top), 8px) + 22px); }
+  /* O iOS desfoca/escurece uma faixa logo abaixo da barra de status nos web apps.
+     --top-band empurra tudo (conteúdo e barra de controle) para fora dessa faixa. */
+  html:not(.rot-cw):not(.rot-ccw) { --top-band: 46px; }
 }
 
 /* Brilho: uma camada preta por cima de tudo (funciona em fundo escuro e claro) */
@@ -177,11 +179,11 @@ body {
   min-height: 0;
   overflow: hidden;
   display: flex;
-  container-type: size;
+  container-type: inline-size;
   line-height: 1.2;
   /* tamanho do texto dos componentes, relativo ao próprio slot
      (as unidades cq resolvem no filho, que tem o slot como container) */
-  --slot-font: clamp(11px, min(40cqh, 12cqw), 26px);
+  --slot-font: clamp(11px, min(12cqw, var(--frame-h, 400px) * 0.05), 24px);
 }
 
 /* alinhamento: cada slot "gruda" no seu canto/borda */
@@ -208,11 +210,11 @@ body {
   line-height: 1;
   white-space: nowrap;
   /* "HH:MM:SS" ocupa ~4.6em de largura */
-  font-size: min(20cqw, 62cqh);
+  font-size: min(20cqw, var(--clock-max-h, 300px) * 0.9);
 }
-.clock-digital.size-hm       { font-size: min(32cqw, 70cqh); }
-.clock-digital.size-hm-ampm  { font-size: min(25cqw, 66cqh); }
-.clock-digital.size-hms-ampm { font-size: min(16.5cqw, 58cqh); }
+.clock-digital.size-hm       { font-size: min(32cqw, var(--clock-max-h, 300px) * 0.95); }
+.clock-digital.size-hm-ampm  { font-size: min(25cqw, var(--clock-max-h, 300px) * 0.92); }
+.clock-digital.size-hms-ampm { font-size: min(16.5cqw, var(--clock-max-h, 300px) * 0.85); }
 
 .clock-digital .hh  { color: var(--c-hours); }
 .clock-digital .mm  { color: var(--c-minutes); }
@@ -229,7 +231,7 @@ body {
 .clock-digital.font-rounded { font-family: var(--font-rounded); font-weight: 400; }
 
 /* relógio analógico */
-.clock-analog { width: min(100cqw, 100cqh); height: min(100cqw, 100cqh); overflow: visible; }
+.clock-analog { width: min(100cqw, var(--clock-max-h, 300px)); height: min(100cqw, var(--clock-max-h, 300px)); overflow: visible; display: block; }
 .clock-analog .face  { fill: none; stroke: var(--fg); stroke-width: 2; opacity: 0.35; }
 .clock-analog .ticks { stroke: var(--fg); stroke-linecap: round; opacity: 0.8; }
 .clock-analog .hand  { stroke-linecap: round; }
@@ -257,7 +259,7 @@ body {
 .comp-text .dot { opacity: 0.6; padding: 0 0.4em; }
 .comp-text .strong { font-weight: 600; font-variant-numeric: tabular-nums; }
 .comp-text-big {
-  font-size: min(11cqw, 40cqh);
+  font-size: min(9cqw, var(--clock-max-h, 300px) * 0.3);
   font-weight: 300;
   opacity: 1;
   font-variant-numeric: tabular-nums;
@@ -297,7 +299,7 @@ body {
 /* ---------- Indicador de brilho ---------- */
 .brightness-indicator {
   position: fixed;
-  top: max(var(--sa-top), 14px);
+  top: calc(max(var(--sa-top), 14px) + var(--top-band, 0px));
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -577,7 +579,7 @@ html.rot-cw .settings-sheet, html.rot-ccw .settings-sheet { max-height: 92%; bor
 /* ---------- Barra de controle (sobreposta, não ocupa a grade) ---------- */
 .topbar {
   position: fixed;
-  top: max(var(--sa-top), 8px);
+  top: calc(max(var(--sa-top), 8px) + var(--top-band, 0px) - 6px);
   left: 50%;
   transform: translate(-50%, -8px);
   display: flex;
@@ -610,7 +612,7 @@ body.ui-visible .topbar { opacity: 1; transform: translate(-50%, 0); pointer-eve
 .tab.on { background: rgba(255, 255, 255, 0.2); color: #fff; }
 .tab-dot { display: none; position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; border-radius: 50%; background: #34c759; }
 .tab.running .tab-dot { display: block; }
-body.ui-visible .brightness-indicator { top: calc(max(var(--sa-top), 14px) + 56px); }
+body.ui-visible .brightness-indicator { top: calc(max(var(--sa-top), 14px) + var(--top-band, 0px) + 56px); }
 
 /* ---------- Aviso de nova versão ---------- */
 .toast {
@@ -706,3 +708,96 @@ body.ui-visible .brightness-indicator { top: calc(max(var(--sa-top), 14px) + 56p
 .time-pick { display: inline-flex; align-items: center; gap: 4px; }
 .time-pick .select-wrap { max-width: none; }
 .link-btn { border: 0; background: none; padding: 0; margin-left: 4px; color: #0a84ff; font: inherit; text-decoration: underline; cursor: pointer; }
+
+
+/* =========================================================
+   v0.5 — layout com linhas coladas no relógio, relógio móvel
+   ========================================================= */
+.face { display: flex; flex-direction: column; height: 100%; }
+.face .spacer { flex: 1 1 0; min-height: 0; }
+.face [hidden] { display: none !important; }
+
+/* bordas: três posições lado a lado */
+.row-edge { display: flex; align-items: flex-start; gap: 8px; }
+.row-edge[data-row="edge-bottom"] { align-items: flex-end; }
+.row-edge > .slot { flex: 1 1 0; }
+.slot[data-slot="TE"] { align-items: flex-start; justify-content: center; text-align: center; }
+.slot[data-slot="BE"] { align-items: flex-end; justify-content: center; text-align: center; }
+
+/* linhas coladas no relógio */
+.row-near { display: flex; justify-content: center; }
+.row-near > .slot { width: 100%; justify-content: center; text-align: center; --slot-font: clamp(12px, min(6cqw, var(--frame-h, 400px) * 0.06), 30px); }
+.row-near[data-row="near-top"] > .slot { align-items: flex-end; padding-bottom: 0.15em; }
+.row-near[data-row="near-bottom"] > .slot { align-items: flex-start; padding-top: 0.15em; }
+
+/* linha do relógio */
+.row-mid { display: grid; grid-template-columns: var(--col-side, 0%) minmax(0, 1fr) var(--col-side, 0%); align-items: stretch; transition: grid-template-columns 0.4s ease; }
+.row-mid > .slot { align-items: center; }
+
+/* componente comum no centro (quando o relógio foi para outra posição): fica grande */
+.slot[data-slot="C"]:not(.has-clock) .comp-text,
+.slot[data-slot="C"]:not(.has-clock) .comp-moon,
+.slot[data-slot="C"]:not(.has-clock) .comp-progress { font-size: min(9cqw, var(--clock-max-h, 300px) * 0.3); opacity: 1; }
+
+/* relógio fora do centro: menor */
+.slot.has-clock:not([data-slot="C"]) .clock-digital { font-size: calc(var(--slot-font) * 2.2); }
+.row-near > .slot.has-clock .clock-digital { font-size: min(14cqw, var(--frame-h, 400px) * 0.16); }
+.slot.has-clock:not([data-slot="C"]) .clock-analog { width: calc(var(--slot-font) * 5); height: calc(var(--slot-font) * 5); }
+.row-near > .slot.has-clock .clock-analog { width: min(40cqw, var(--frame-h, 400px) * 0.3); height: min(40cqw, var(--frame-h, 400px) * 0.3); }
+
+.sun { display: inline-flex; align-items: center; gap: 0.2em; white-space: nowrap; }
+.sun-ic { width: 1.1em; height: 1.1em; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ---------- barra: botão digital/analógico e ícones das abas ---------- */
+#face-button .ic-digital { display: none; }
+html[data-clock="analog"] #face-button .ic-analog { display: none; }
+html[data-clock="analog"] #face-button .ic-digital { display: block; }
+html:not([data-tab="clock"]) #face-button { display: none; }
+.tab { display: inline-flex; align-items: center; gap: 6px; }
+.tab-ic { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+html.narrow .tab span { display: none; }
+html.narrow .tab { padding: 9px 11px; }
+
+/* ---------- Pomodoro ---------- */
+.pomo-phase { font-size: clamp(14px, 5cqh, 24px); letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.8; }
+.tview[data-phase="short"] .tv-big, .tview[data-phase="long"] .tv-big { opacity: 0.85; }
+.pomo-dots { display: flex; gap: 10px; }
+.pomo-dots i { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid color-mix(in srgb, var(--fg) 60%, transparent); }
+.pomo-dots i.on { background: var(--fg); border-color: var(--fg); }
+.pomo-dots i.cur { box-shadow: 0 0 0 3px color-mix(in srgb, var(--fg) 25%, transparent); }
+.tview[data-view="pomodoro"] .tv-actions .tbtn { min-width: 0; }
+
+/* ---------- Editor: mini-grade com arrastar e soltar ---------- */
+.slot-grid {
+  grid-template-columns: 1fr 1.6fr 1fr !important;
+  grid-template-rows: 34px 34px 58px 34px 34px !important;
+  grid-template-areas: "TL TE TR" "T T T" "L C R" "B B B" "BL BE BR";
+  touch-action: none;
+}
+.slot-grid button { touch-action: none; -webkit-user-select: none; user-select: none; }
+.slot-grid button.has-clock { background: color-mix(in srgb, #0a84ff 22%, var(--ui-grid-cell)); border-color: #0a84ff; color: var(--ui-text); font-weight: 600; }
+.slot-grid button.dragging { opacity: 0.45; transform: scale(0.96); }
+.slot-grid button.drop-target { outline: 2px dashed #0a84ff; outline-offset: 1px; }
+
+/* presets */
+.preset-row .preset-actions { display: flex; gap: 6px; }
+.preset-save { display: flex; gap: 8px; flex: 1; }
+.preset-save .field-input { max-width: none; }
+
+/* localização */
+.loc-results { display: flex; flex-direction: column; }
+.loc-results button {
+  border: 0; border-top: 1px solid var(--ui-line); background: transparent; color: var(--ui-text);
+  text-align: left; padding: 11px 14px; font: inherit; cursor: pointer;
+}
+.source-note { font-size: 12.5px; color: var(--ui-text-2); }
+.source-note a { color: #0a84ff; }
+.notice-actions.wrap { flex-wrap: wrap; }
+.warn-text { color: var(--ui-danger); }
+/* posição do meio das bordas ganha mais espaço */
+.row-edge > .slot[data-slot="TE"], .row-edge > .slot[data-slot="BE"] { flex: 1.6 1 0; }
+/* nas colunas laterais, o separador "·" vira quebra de linha */
+.row-mid > .slot:not([data-slot="C"]) .dot { display: block; height: 0; overflow: hidden; padding: 0; }
+.row-mid > .slot:not([data-slot="C"]) .sun { display: flex; }
+/* bordas: mesmo tamanho de texto nas três posições, proporcional à tela */
+.row-edge > .slot { --slot-font: clamp(11px, min(var(--frame-w, 400px) * 0.04, var(--frame-h, 400px) * 0.05), 24px); }

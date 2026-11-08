@@ -1,12 +1,12 @@
-// Temperatura atual via Open-Meteo (gratuito, sem chave, sem cadastro).
-// A API sempre responde em °C; a conversão para °F é feita aqui, sem nova consulta.
+// Temperatura atual via Open-Meteo (gratuito, sem chave, sem cadastro — https://open-meteo.com/).
+// Usa a localização escolhida em location.js. A API responde em °C; a conversão para °F é local.
 import * as store from "./store.js";
 
 const API = "https://api.open-meteo.com/v1/forecast";
 const REFRESH_MS = 30 * 60 * 1000;   // atualiza a cada 30 min
 const RETRY_MS = 5 * 60 * 1000;      // após erro, tenta de novo em 5 min
 
-// status: off | locating | updating | ok | denied | error | unsupported
+// status: off | updating | ok | error | nolocation
 let status = "off";
 let lastErrorAt = 0;
 const listeners = new Set();
@@ -16,37 +16,18 @@ function setStatus(s) {
   listeners.forEach((fn) => fn(status));
 }
 
-export function getStatus() {
-  return status;
-}
+export const getStatus = () => status;
 
 export function subscribe(fn) {
   listeners.add(fn);
   return () => listeners.delete(fn);
 }
 
-export const supported = "geolocation" in navigator;
-
 /** Converte e formata: 22.4 → "22°C" ou "72°F". */
 export function formatTemp(tempC, unit) {
   if (tempC == null || Number.isNaN(tempC)) return "";
   const v = unit === "F" ? tempC * 9 / 5 + 32 : tempC;
   return `${Math.round(v)}°${unit}`;
-}
-
-/** Pede a localização (dispara o pedido de permissão do sistema na 1ª vez). */
-function locate() {
-  return new Promise((resolve, reject) => {
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({
-        // 2 casas decimais (~1 km) bastam para o clima e preservam a privacidade
-        lat: Math.round(pos.coords.latitude * 100) / 100,
-        lon: Math.round(pos.coords.longitude * 100) / 100,
-      }),
-      (err) => reject(err),
-      { enableHighAccuracy: false, timeout: 15000, maximumAge: 60 * 60 * 1000 }
-    );
-  });
 }
 
 async function fetchCurrent(lat, lon) {
@@ -58,48 +39,13 @@ async function fetchCurrent(lat, lon) {
   return { tempC: c.temperature_2m, code: c.weather_code, isDay: c.is_day === 1 };
 }
 
-/**
- * Ativa a temperatura: pede localização e busca o clima.
- * Retorna true se deu certo. Em caso de negação, status = "denied".
- */
-export async function enable() {
-  if (!supported) { setStatus("unsupported"); return false; }
-  setStatus("locating");
-  try {
-    const coords = await locate();
-    store.set({ tempEnabled: true });
-    await update(coords);
-    return true;
-  } catch (err) {
-    if (err && err.code === 1) {            // PERMISSION_DENIED
-      store.set({ tempEnabled: false });
-      setStatus("denied");
-    } else {
-      // posição indisponível / timeout: mantém ligado e tenta depois
-      store.set({ tempEnabled: true });
-      lastErrorAt = Date.now();
-      setStatus("error");
-    }
-    return false;
-  }
-}
-
-export function disable() {
-  store.set({ tempEnabled: false });
-  setStatus("off");
-}
-
-/** Busca o clima usando as coordenadas informadas ou as salvas. */
-async function update(coords) {
-  const cache = store.getWeatherCache() || {};
-  const lat = coords?.lat ?? cache.lat;
-  const lon = coords?.lon ?? cache.lon;
-  if (lat == null || lon == null) return enable();
-
+export async function update() {
+  const loc = store.get().location;
+  if (typeof loc?.lat !== "number") { setStatus("nolocation"); return; }
   setStatus("updating");
   try {
-    const data = await fetchCurrent(lat, lon);
-    store.setWeatherCache({ ...data, lat, lon, updatedAt: Date.now() });
+    const data = await fetchCurrent(loc.lat, loc.lon);
+    store.setWeatherCache({ ...data, lat: loc.lat, lon: loc.lon, updatedAt: Date.now() });
     setStatus("ok");
   } catch {
     lastErrorAt = Date.now();
@@ -107,35 +53,32 @@ async function update(coords) {
   }
 }
 
-/** "Atualizar agora": tenta renovar a localização e depois o clima. */
-export async function refreshNow() {
-  if (!store.get().tempEnabled) return;
-  try {
-    const coords = await locate();
-    await update(coords);
-  } catch (err) {
-    if (err && err.code === 1) {
-      store.set({ tempEnabled: false });
-      setStatus("denied");
-    } else {
-      await update(); // sem localização nova: usa a salva
-    }
-  }
+export function enable() {
+  store.set({ tempEnabled: true });
+  return update();
 }
 
-/** Chamado periodicamente: atualiza se o dado estiver velho. */
+export function disable() {
+  store.set({ tempEnabled: false });
+  setStatus("off");
+}
+
+export const refreshNow = () => update();
+
+/** Chamado periodicamente: atualiza se o dado estiver velho ou se a localização mudou. */
 export function tick() {
   if (!store.get().tempEnabled) return;
-  if (status === "locating" || status === "updating") return;
-  if (document.visibilityState !== "visible") return;
+  if (status === "updating" || document.visibilityState !== "visible") return;
+  const loc = store.get().location;
+  if (typeof loc?.lat !== "number") { if (status !== "nolocation") setStatus("nolocation"); return; }
   const cache = store.getWeatherCache();
+  const moved = !cache || cache.lat !== loc.lat || cache.lon !== loc.lon;
   const age = cache?.updatedAt ? Date.now() - cache.updatedAt : Infinity;
   const sinceError = Date.now() - lastErrorAt;
-  if (age >= REFRESH_MS && sinceError >= RETRY_MS) update();
+  if ((moved || age >= REFRESH_MS) && sinceError >= RETRY_MS) update();
 }
 
 export function init() {
-  if (!supported) { status = "unsupported"; return; }
   if (store.get().tempEnabled) {
     status = store.getWeatherCache()?.updatedAt ? "ok" : "off";
     tick();

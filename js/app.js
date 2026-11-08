@@ -7,6 +7,8 @@ import * as settings from "./settings.js";
 import { THEMES, resolveTheme, onSystemChange } from "./themes.js";
 import * as sound from "./sound.js";
 import * as timers from "./timer.js";
+import * as pomodoro from "./pomodoro.js";
+import * as location from "./location.js";
 import * as update from "./update.js";
 import { initPicker } from "./picker.js";
 
@@ -172,6 +174,17 @@ function setRotationClasses(next) {
  * Aplica a orientação. Com animate = true, usa a transição "girar e esmaecer":
  * o conteúdo encolhe e some girando um pouco no sentido do giro, e volta já na nova orientação.
  */
+function setFrameVars() {
+  // tamanho do "quadro" do app (já considerando o giro forçado)
+  const w = window.innerWidth, h = window.innerHeight;
+  const rotated = rotation !== "none";
+  const fw = rotated ? h : w, fh = rotated ? w : h;
+  rootStyle.setProperty("--frame-w", fw + "px");
+  rootStyle.setProperty("--frame-h", fh + "px");
+  document.documentElement.classList.toggle("narrow", fw < 600);
+  relayout();
+}
+
 function applyOrientation(animate = false) {
   rootStyle.setProperty("--app-w", window.innerWidth + "px");
   rootStyle.setProperty("--app-h", window.innerHeight + "px");
@@ -180,8 +193,8 @@ function applyOrientation(animate = false) {
   $("rotate-button").setAttribute("aria-pressed", String(forced));
 
   const next = targetRotation();
-  if (next === rotation) return;
-  if (!animate || reduceMotion || rotating || !stage.animate) { setRotationClasses(next); return; }
+  if (next === rotation) { setFrameVars(); return; }
+  if (!animate || reduceMotion || rotating || !stage.animate) { setRotationClasses(next); setFrameVars(); return; }
 
   // sentido visual do giro: entrar em cw ou sair de ccw = horário (+); o contrário = anti-horário (−)
   const dir = next === "cw" || rotation === "ccw" ? 1 : -1;
@@ -192,6 +205,7 @@ function applyOrientation(animate = false) {
   );
   out.onfinish = () => {
     setRotationClasses(next);
+    setFrameVars();
     const inn = stage.animate(
       [{ opacity: 0, transform: `scale(0.9) rotate(${-dir * 10}deg)` }, { opacity: 1, transform: "none" }],
       { duration: 260, easing: "cubic-bezier(.2,.8,.2,1)" }
@@ -204,6 +218,13 @@ function applyOrientation(animate = false) {
 window.addEventListener("resize", () => applyOrientation(false));
 window.addEventListener("orientationchange", () => setTimeout(() => applyOrientation(false), 250));
 
+// troca rápida digital ⇄ analógico (só na aba Relógio)
+$("face-button").addEventListener("click", () => {
+  const c = store.get().clock;
+  store.setClock({ type: c.type === "analog" ? "digital" : "analog" });
+  showUI();
+});
+
 $("rotate-button").addEventListener("click", () => {
   const next = store.get().orientation === "landscape" ? "auto" : "landscape";
   pendingRotateAnim = true;
@@ -213,7 +234,7 @@ $("rotate-button").addEventListener("click", () => {
 let pendingRotateAnim = false;
 
 // ---------------- Abas ----------------
-const TABS = ["clock", "timer", "stopwatch"];
+const TABS = ["clock", "timer", "stopwatch", "pomodoro"];
 
 function applyTab() {
   const tab = store.get().tab;
@@ -223,13 +244,16 @@ function applyTab() {
     b.classList.toggle("on", on);
     b.setAttribute("aria-selected", String(on));
   });
+  document.documentElement.dataset.tab = tab;
   timers.setActiveTab(tab);
+  pomodoro.setActive(tab === "pomodoro");
   if (tab === "clock") { relayout(); tick(); }
 }
 
 function updateTabDots() {
   document.querySelector('.tab[data-tab="timer"]').classList.toggle("running", timers.timerActive());
   document.querySelector('.tab[data-tab="stopwatch"]').classList.toggle("running", timers.stopwatchActive());
+  document.querySelector('.tab[data-tab="pomodoro"]').classList.toggle("running", pomodoro.isActive());
 }
 
 function switchTab(delta) {
@@ -330,6 +354,7 @@ function tick() {
   if (now.getMinutes() !== lastMinute) {
     lastMinute = now.getMinutes();
     applyTheme(now);
+    location.tick();
     weather.tick();
   }
   return now;
@@ -338,6 +363,7 @@ function tick() {
 function loop() {
   const now = tick();
   timers.tick(now.getTime());
+  pomodoro.tick(now.getTime());
   sound.onTick(now, { night: nightActive(now) });
   // agenda para logo após a virada do próximo segundo
   setTimeout(loop, 1000 - (Date.now() % 1000) + 15);
@@ -345,13 +371,16 @@ function loop() {
 
 // ---------------- Reação a mudanças nas configurações ----------------
 store.subscribe((s, patch) => {
-  if ("language" in patch) { applyLanguage(); mountFace(grid, true); timers.relabel(); }
+  if ("language" in patch) { applyLanguage(); mountFace(grid, true); timers.relabel(); pomodoro.relabel(); }
+  if ("clock" in patch) document.documentElement.dataset.clock = s.clock.type;
+  if ("pomo" in patch) pomodoro.render();
+  if ("location" in patch) weather.tick();
   if ("tab" in patch) applyTab();
   if (["theme", "nightEnabled", "nightStart", "nightEnd", "face", "custom", "uiTheme"].some((k) => k in patch)) applyTheme();
   if ("orientation" in patch || "rotateDir" in patch) { applyOrientation(pendingRotateAnim || "orientation" in patch); pendingRotateAnim = false; }
   if ("burnIn" in patch) applyBurnIn();
   if ("brightness" in patch) applyBrightness(s.brightness);
-  if ("face" in patch || "custom" in patch) mountFace(grid);
+  if (["face", "custom", "clock", "infoPosition", "presets"].some((k) => k in patch)) mountFace(grid);
   relayout();
   tick();
 });
@@ -370,6 +399,12 @@ timers.init({
 });
 timers.mountTimer($("timer-view"));
 timers.mountStopwatch($("stopwatch-view"));
+pomodoro.init({
+  changed: updateTabDots,
+  finished: () => { if (store.get().tab !== "pomodoro") store.set({ tab: "pomodoro" }); },
+});
+pomodoro.mount($("pomodoro-view"));
+document.documentElement.dataset.clock = store.get().clock.type;
 applyTab();
 updateTabDots();
 settings.initSettings({ onClose: () => tick(), wakeLockState: () => wakeLockState });

@@ -4,15 +4,19 @@
 
 Funciona como um app instalado na Tela de Início (PWA): tela cheia, tela sempre ligada, funciona offline.
 
-## Funcionalidades (v0.4.0)
+## Funcionalidades (v0.5.0)
 
-- Três abas: **Relógio**, **Timer** e **Cronômetro** — troque pela barra do topo (aparece com um toque) ou deslizando para o lado
+- Quatro abas: **Relógio**, **Timer**, **Cronômetro** e **Pomodoro** — troque pela barra do topo (aparece com um toque) ou deslizando para o lado
+- **Pomodoro**: foco, pausa curta e pausa longa a cada N focos, com durações configuráveis e início automático opcional
+- Troca rápida **digital ⇄ analógico** pelo botão na barra do topo
 - **Timer**: ajuste de horas/minutos/segundos (segure para repetir), atalhos (1–60 min), pausa, +1 min e alarme; continua certo em segundo plano
 - **Cronômetro**: voltas (parcial e total), pausa e zerar; o estado fica salvo
-- Mostrador **Minimalista**: `HH:MM:SS` em 24h, pronto para usar
-- Mostrador **Customizado**: grade 3×3 em que cada posição recebe um componente
-  - Centro: relógio digital (12/24h, segundos, dois-pontos piscando, 5 fontes), analógico ou texto livre
-  - Posições: dia + data, dia da semana, data, temperatura, outro fuso, progresso (dia/semana/mês/ano), fase da lua, contagem até uma data, texto livre
+- Relógio **digital** (12/24h, segundos, dois-pontos piscando, 5 fontes) ou **analógico** — as opções valem para os dois mostradores
+- Mostrador **Minimalista**: relógio + dia e data (acima ou abaixo, coladinhos no relógio)
+- Mostrador **Customizado**: 11 posições (bordas de cima e de baixo, logo acima/abaixo do relógio e laterais)
+  - Arraste uma posição sobre outra para trocar — inclusive o relógio, que pode ir para qualquer lugar
+  - Componentes: dia + data, dia da semana, data, temperatura, outro fuso, progresso (dia/semana/mês/ano), fase da lua, nascer/pôr do sol, contagem até uma data, texto livre
+  - **Presets**: salve e reaplique layouts
   - Texto livre com placeholders: `{HH} {hh} {mm} {ss} {ampm} {weekday} {wd} {day} {month} {monthName} {mon} {year} {date} {temp}`
   - Cores personalizadas: fundo, principal e uma cor para horas, minutos e segundos
 - 7 paletas: **Sistema** (padrão; segue o modo claro/escuro do aparelho), Terminal, Âmbar, Neve, Gelo, Noturno e Papel (clara)
@@ -29,7 +33,9 @@ Funciona como um app instalado na Tela de Início (PWA): tela cheia, tela sempre
 - **Procurar atualização** nas configurações (e aviso automático quando sai versão nova)
 - **Modo noturno** automático por horário (cor vermelha escura)
 - **Proteção contra burn-in**: o relógio se move alguns pixels a cada minuto
-- **Temperatura** (opcional) via [Open-Meteo](https://open-meteo.com), com °C/°F e horário da última atualização
+- **Localização** em três modos: precisa (GPS, com permissão), aproximada pela internet (IP, sem permissão, via [GeoJS](https://www.geojs.io/)) ou cidade escolhida (busca do [Open-Meteo](https://open-meteo.com/en/docs/geocoding-api))
+- **Temperatura** (opcional) via [Open-Meteo](https://open-meteo.com) (CC BY 4.0), com °C/°F e horário da última atualização
+- **Nascer/pôr do sol** calculado no próprio aparelho
 - Idiomas: **Português (Brasil)** e **English (US)**, com detecção automática
 - Formatos de data: automático, DD/MM/AAAA, MM/DD/AAAA, ISO, por extenso, com escolha do separador
 
@@ -53,7 +59,7 @@ Abra o endereço no Chrome → menu ⋮ → **Instalar app** (ou *Adicionar à t
 
 ## Publicar uma nova versão
 
-Ao alterar arquivos, aumente `CACHE_VERSION` em `sw.js` (ex.: `nada-clock-v0.4.1`) e `VERSION` em `js/settings.js`. Assim os aparelhos baixam os arquivos novos.
+Ao alterar arquivos, aumente `CACHE_VERSION` em `sw.js` (ex.: `nada-clock-v0.5.1`) e `VERSION` em `js/settings.js`. Assim os aparelhos baixam os arquivos novos.
 
 ## Estrutura
 
@@ -71,6 +77,8 @@ js/sound.js             sons sintetizados (Web Audio)
 js/timer.js             abas Timer e Cronômetro
 js/picker.js            seletor próprio (substitui o select nativo)
 js/update.js            atualizações do app (service worker)
+js/pomodoro.js          aba Pomodoro
+js/location.js          localização (GPS, IP ou cidade)
 js/settings.js          painel de configurações
 js/weather.js           temperatura (Open-Meteo)
 js/store.js             preferências salvas no aparelho
@@ -92,12 +100,16 @@ python3 -m http.server 8000
 - [x] Relógio Minimalista
 - [x] Relógio Customizado (grade 3x3 com componentes e placeholders, paleta clara, Sistema)
 - [x] Timer e Cronômetro
-- [ ] Localização sem permissão (aproximada por IP ou escolha da cidade)
-- [ ] Vários presets salvos no Customizado
-- [ ] Nascer/pôr do sol
-- [ ] Pomodoro
-- [ ] Análise: app nativo com widget / Live Activity (Dynamic Island) para Timer e Pomodoro
+- [x] Localização sem permissão (aproximada por IP ou escolha da cidade)
+- [x] Vários presets salvos no Customizado
+- [x] Nascer/pôr do sol
+- [x] Pomodoro
+- [ ] Análise (adiada): app nativo com widget / Live Activity (Dynamic Island) para Timer e Pomodoro
 
-## Privacidade
+## Privacidade e serviços externos
 
-Sem anúncios, sem rastreamento, sem conta. As preferências e a localização aproximada (para a temperatura) ficam salvas só no seu aparelho.
+Sem anúncios, sem rastreamento, sem conta. As preferências e a localização (arredondada, ~1 km) ficam salvas só no seu aparelho.
+Serviços usados apenas quando você ativa os recursos correspondentes:
+
+- [Open-Meteo](https://open-meteo.com/) — temperatura (CC BY 4.0) e busca de cidades
+- [GeoJS](https://www.geojs.io/) — localização aproximada pelo IP
