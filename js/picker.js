@@ -60,8 +60,8 @@ export function handleSelectTap(e) {
   const sel = wrap.querySelector("select");
   if (!sel || sel.disabled) return false;
   e.preventDefault();
-  const row = wrap.closest(".row");
-  const label = row?.querySelector(".row-label")?.childNodes[0]?.textContent?.trim() || "";
+  const row = wrap.closest(".row, .ep-row");
+  const label = row?.querySelector(".row-label, .ep-label")?.childNodes[0]?.textContent?.trim() || "";
   openPicker({
     title: label,
     options: [...sel.options].map((o) => ({ value: o.value, label: o.textContent })),

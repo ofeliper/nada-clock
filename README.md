@@ -4,7 +4,7 @@
 
 Funciona como um app instalado na Tela de Início (PWA): tela cheia, tela sempre ligada, funciona offline.
 
-## Funcionalidades (v0.6.0)
+## Funcionalidades (v0.7.0)
 
 - Quatro abas: **Relógio**, **Timer**, **Cronômetro** e **Pomodoro** — troque pela barra do topo (aparece com um toque) ou deslizando para o lado
 - **Timer**: vários ao mesmo tempo, com nome (ex.: "macarrão", "forno")
@@ -20,6 +20,13 @@ Funciona como um app instalado na Tela de Início (PWA): tela cheia, tela sempre
   - **Presets**: salve e reaplique layouts
   - Texto livre com placeholders: `{HH} {hh} {mm} {ss} {ampm} {weekday} {wd} {day} {month} {monthName} {mon} {year} {date} {temp} {weather} {feels} {tmax} {tmin} {humidity} {rain}`
   - Cores personalizadas: fundo, principal e uma cor para horas, minutos e segundos
+- Mostrador **Interativo (beta)**: monte a tela à mão, direto no relógio
+  - Toque no lápis da barra (ou em Configurações → Editar a tela)
+  - **＋ Adicionar** qualquer componente (inclusive mais de um relógio) e arraste para onde quiser
+  - "Ímã": o elemento gruda no centro, nas margens e no alinhamento dos outros, com linhas-guia
+  - Cada elemento tem tamanho (barra, −/+ ou pinça com dois dedos), cor, opacidade, alinhamento e fonte próprios, além das opções do tipo (fuso, texto, relógio digital/analógico…)
+  - Duplicar, trazer para a frente, remover; setas do teclado movem, Delete remove
+  - Layouts separados para a tela deitada e em pé; **Padrão** volta ao layout inicial
 - 7 paletas: **Sistema** (padrão; segue o modo claro/escuro do aparelho), Terminal, Âmbar, Neve, Gelo, Noturno e Papel (clara)
 - **Restaurar padrão** nas configurações
 - **Backup**: exportar e importar todas as configurações (arquivo JSON, sem a localização)
@@ -69,7 +76,7 @@ Abra o endereço no Chrome → menu ⋮ → **Instalar app** (ou *Adicionar à t
 
 ## Publicar uma nova versão
 
-Ao alterar arquivos, aumente `CACHE_VERSION` em `sw.js` (ex.: `nada-clock-v0.6.1`) e `VERSION` em `js/settings.js`. Assim os aparelhos baixam os arquivos novos.
+Ao alterar arquivos, aumente `CACHE_VERSION` em `sw.js` (ex.: `nada-clock-v0.7.1`) e `VERSION` em `js/settings.js`. Assim os aparelhos baixam os arquivos novos.
 
 ## Estrutura
 
@@ -80,6 +87,7 @@ sw.js                   service worker (offline)
 css/style.css           visual e paletas
 js/app.js               início, gestos, brilho, wake lock, burn-in, modo noturno
 js/faces.js             motor da grade 3x3 (Minimalista e Customizado)
+js/free.js              mostrador Interativo: elementos livres e editor na tela
 js/components.js        componentes (relógios, data, fuso, progresso, lua, contagem, texto)
 js/tokens.js            placeholders do texto livre
 js/themes.js            paletas e modo Sistema
@@ -122,6 +130,7 @@ python3 -m http.server 8000
 - [x] Vários presets salvos no Customizado
 - [x] Nascer/pôr do sol
 - [x] Pomodoro
+- [x] Mostrador Interativo (beta): editor na tela com arrastar e soltar
 - [ ] Métricas anônimas (ex.: GoatCounter) e domínio próprio — adiados
 - [ ] Análise (adiada): app nativo com widget / Live Activity (Dynamic Island) para Timer e Pomodoro
 

@@ -42,6 +42,34 @@ export const DEFAULT_CUSTOM = {
   },
 };
 
+/**
+ * Mostrador Interativo: elementos livres numa "tela" com proporção ar (largura/altura).
+ * x, y = posição em % da tela; size = tamanho da fonte em % da largura da tela.
+ */
+export function defaultInteractive(clock = DEFAULT_CLOCK) {
+  return {
+    ar: 844 / 390,
+    elements: [
+      { id: "clock", type: "clock", x: 50, y: 54, size: 19, align: "center", opacity: 1, color: null, font: null, opts: { ...DEFAULT_CLOCK, ...clock } },
+      { id: "date", type: "weekdayDate", x: 50, y: 24, size: 3.4, align: "center", opacity: 0.6, color: null, font: "rounded", opts: {} },
+    ],
+    // tela em pé: começa com um layout próprio (auto). Se você editar só a tela deitada,
+    // o "auto" é descartado e a tela em pé passa a seguir a deitada (null).
+    port: { ...defaultPortrait(clock), auto: true },
+  };
+}
+
+/** Layout padrão para a tela em pé. */
+export function defaultPortrait(clock = DEFAULT_CLOCK) {
+  return {
+    ar: 390 / 844,
+    elements: [
+      { id: "clock", type: "clock", x: 50, y: 48, size: 19, align: "center", opacity: 1, color: null, font: null, opts: { ...DEFAULT_CLOCK, ...clock } },
+      { id: "date", type: "weekdayDate", x: 50, y: 40, size: 5.2, align: "center", opacity: 0.6, color: null, font: "rounded", opts: {} },
+    ],
+  };
+}
+
 export const DEFAULT_SOUNDS = {
   volume: 0.6,
   muteAtNight: true,      // silencia durante o modo noturno
@@ -72,7 +100,7 @@ export const DEFAULT_LOCATION = {
 
 export const DEFAULTS = {
   language: "auto",        // auto | pt-BR | en-US
-  face: "minimal",         // minimal | custom
+  face: "minimal",         // minimal | custom | interactive
   theme: "system",         // system | terminal | amber | snow | ice | night | paper
   clock: DEFAULT_CLOCK,
   showDate: true,
@@ -101,6 +129,7 @@ export const DEFAULTS = {
   pomo: DEFAULT_POMO,
   custom: DEFAULT_CUSTOM,
   presets: [],             // presets salvos do Customizado
+  interactive: null,       // mostrador Interativo (criado no hydrate a partir do relógio atual)
 };
 
 const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -126,6 +155,7 @@ function writeJSON(key, value) {
 /** Junta o que foi salvo com os padrões e migra formatos de versões anteriores. */
 function hydrate(saved) {
   const base = clone(DEFAULTS);
+  base.interactive = defaultInteractive(base.clock);
   if (!saved || typeof saved !== "object") return base;
   const out = { ...base, ...saved };
   const c = saved.custom || {};
@@ -150,6 +180,7 @@ function hydrate(saved) {
   out.pomo = { ...base.pomo, ...(saved.pomo || {}) };
   out.location = { ...base.location, ...(saved.location || {}) };
   out.presets = Array.isArray(saved.presets) ? saved.presets : [];
+  out.interactive = validInteractive(saved.interactive) ? saved.interactive : defaultInteractive(out.clock);
 
   // v0.4 → v0.5: localização ficava junto do clima (GPS)
   if (!saved.location) {
@@ -157,6 +188,13 @@ function hydrate(saved) {
     if (w && typeof w.lat === "number") out.location = { mode: "gps", lat: w.lat, lon: w.lon, name: "", updatedAt: w.updatedAt || 0 };
   }
   return out;
+}
+
+function validLayout(v) {
+  return v && typeof v === "object" && Number(v.ar) > 0 && Array.isArray(v.elements) && v.elements.every((e) => e && typeof e.type === "string" && typeof e.id === "string");
+}
+function validInteractive(v) {
+  return validLayout(v) && (v.port == null || validLayout(v.port));
 }
 
 let state = hydrate(readJSON(KEY));
@@ -259,7 +297,7 @@ export function importSettings(obj) {
 /** Volta tudo à configuração original. */
 export function reset() {
   writeJSON(WEATHER_KEY, null);
-  const fresh = clone(DEFAULTS);
+  const fresh = hydrate(null);
   const patch = Object.fromEntries(Object.keys(fresh).map((k) => [k, fresh[k]]));
   state = fresh;
   writeJSON(KEY, state);

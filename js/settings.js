@@ -15,7 +15,7 @@ import * as share from "./share.js";
 
 const REPO = "https://github.com/ofeliper/nada-clock";
 
-export const VERSION = "0.6.0";
+export const VERSION = "0.7.0";
 
 const DATE_FORMATS = ["auto", "dmy", "mdy", "ymd", "short", "long"];
 const SEPARATORS = ["/", "-", "."];
@@ -37,7 +37,9 @@ let sharePanel = null;        // { url, title } — painel de compartilhar prese
 let shareMsg = "";
 let backupMsg = "";
 
-export function initSettings({ onClose, wakeLockState }) {
+let onEditScreen = null;
+export function initSettings({ onClose, wakeLockState, editScreen }) {
+  onEditScreen = editScreen;
   root = document.getElementById("settings");
   body = document.getElementById("settings-body");
   onCloseCb = onClose;
@@ -105,14 +107,18 @@ function render() {
   const scroll = body.scrollTop;
   const lang = getLanguage();
   const custom = s.face === "custom";
+  const inter = s.face === "interactive";
+  const minimal = !custom && !inter;
 
   body.innerHTML = `
     ${group(t("group.display"), `
       <div class="segmented" role="group" aria-label="${t("face.label")}">
-        <button type="button" data-action="face" data-value="minimal" aria-pressed="${!custom}">${t("face.minimal")}</button>
+        <button type="button" data-action="face" data-value="minimal" aria-pressed="${minimal}">${t("face.minimal")}</button>
         <button type="button" data-action="face" data-value="custom" aria-pressed="${custom}">${t("face.custom")}</button>
+        <button type="button" data-action="face" data-value="interactive" aria-pressed="${inter}">${t("face.interactive")}</button>
       </div>
-      <div class="row"><span class="row-label"><span class="row-hint">${t(custom ? "face.customHint" : "face.minimalHint")}</span></span></div>
+      <div class="row"><span class="row-label"><span class="row-hint">${t(custom ? "face.customHint" : inter ? "face.interactiveHint" : "face.minimalHint")}</span></span>
+        ${inter ? `<button type="button" class="btn" data-action="edit-screen">${t("edit.open")}</button>` : ""}</div>
       <div class="swatches" role="group" aria-label="${t("theme.label")}">
         ${THEME_ORDER.map((th) => swatch(th, s.theme === th)).join("")}
       </div>
@@ -123,14 +129,14 @@ function render() {
       ], s.rotateDir) : ""}
     `)}
 
-    ${group(t("group.clock"), clockSection(s))}
+    ${inter ? "" : group(t("group.clock"), clockSection(s))}
 
     ${custom ? slotsSection(s) + presetsSection(s) + colorsSection(s) : ""}
 
     ${group(t("group.info"), `
-      ${!custom ? switchRow("showWeekday", t("info.weekday"), s.showWeekday) : ""}
-      ${!custom ? switchRow("showDate", t("info.date"), s.showDate) : ""}
-      ${!custom ? selectRow("infoPosition", t("info.position"), [
+      ${minimal ? switchRow("showWeekday", t("info.weekday"), s.showWeekday) : ""}
+      ${minimal ? switchRow("showDate", t("info.date"), s.showDate) : ""}
+      ${minimal ? selectRow("infoPosition", t("info.position"), [
         { value: "top", label: t("info.above") }, { value: "bottom", label: t("info.below") },
       ], s.infoPosition) : ""}
       ${dateFormatRows(s)}
@@ -851,6 +857,7 @@ function onClick(e) {
   switch (action) {
     case "theme": store.set({ theme: value }); break;
     case "face": store.set({ face: value }); break;
+    case "edit-screen": close(); onEditScreen?.(); break;
     case "clock-type": store.setClock({ type: value }); break;
     case "slot": if (!dragJustEnded) { selectedSlot = value; render(); } break;
 

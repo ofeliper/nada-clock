@@ -55,6 +55,8 @@
           <div class="slot" data-slot="BL"></div><div class="slot" data-slot="BE"></div><div class="slot" data-slot="BR"></div>
         </div>
       </div>
+      <!-- Aba Relógio, mostrador Interativo: elementos livres (js/free.js) -->
+      <div id="free" class="free view" data-view="clock"></div>
       <!-- Aba Timer -->
       <div id="timer-view" class="tview view" data-view="timer" hidden></div>
       <!-- Aba Cronômetro -->
@@ -82,6 +84,9 @@
       <svg class="ic-analog" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
       <svg class="ic-digital" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="3"/><path d="M7 10v4M10 10v4M14 10v4h3v-4h-3"/></svg>
     </button>
+    <button id="edit-button" class="bar-btn" type="button" data-i18n-aria="edit.open" aria-label="Editar a tela">
+      <svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4Z"/><path d="M13.5 6.5l4 4"/></svg>
+    </button>
     <div class="tabs" role="tablist">
       <button type="button" class="tab" role="tab" data-tab="clock" data-i18n-aria="tab.clock"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg><span data-i18n="tab.clock">Relógio</span></button>
       <button type="button" class="tab" role="tab" data-tab="timer" data-i18n-aria="tab.timer"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10M7 21h10M8 3c0 5 8 5 8 9s-8 4-8 9M16 3c0 5-8 5-8 9s8 4 8 9"/></svg><span data-i18n="tab.timer">Timer</span><i class="tab-dot"></i></button>
@@ -97,6 +102,13 @@
       </svg>
     </button>
   </nav>
+
+  <!-- Editor do mostrador Interativo -->
+  <div id="edit-ui" class="edit-ui" hidden>
+    <div class="edit-panel" hidden></div>
+    <div class="edit-toolbar" role="toolbar"></div>
+    <div class="edit-add" hidden></div>
+  </div>
 
   <!-- Bloqueio de toques: camada que segura todos os toques; segurar para desbloquear -->
   <div id="lock-shield" class="lock-shield" hidden></div>

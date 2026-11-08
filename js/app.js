@@ -12,6 +12,7 @@ import * as location from "./location.js";
 import * as update from "./update.js";
 import { initPicker } from "./picker.js";
 import * as share from "./share.js";
+import * as free from "./free.js";
 
 const $ = (id) => document.getElementById(id);
 const stage = $("stage");
@@ -162,7 +163,7 @@ $("settings-button").addEventListener("click", () => {
 
 // ---------------- Modo espelho ----------------
 function applyMirror() {
-  document.documentElement.classList.toggle("mirror", !!store.get().mirror);
+  document.documentElement.classList.toggle("mirror", !!store.get().mirror && !free.isEditing());
 }
 
 // ---------------- Bloqueio de toques ----------------
@@ -283,6 +284,7 @@ window.addEventListener("orientationchange", () => setTimeout(() => applyOrienta
 
 // troca rápida digital ⇄ analógico (só na aba Relógio)
 $("face-button").addEventListener("click", () => {
+  if (store.get().face === "interactive") { free.toggleClockType(); showUI(); return; }
   const c = store.get().clock;
   store.setClock({ type: c.type === "analog" ? "digital" : "analog" });
   showUI();
@@ -343,6 +345,7 @@ function toAppDelta(dxScreen, dyScreen) {
 let gesture = null;
 
 stage.addEventListener("pointerdown", (e) => {
+  if (free.isEditing()) return;                  // o editor cuida dos toques
   if (e.target.closest("button, input, select, a, label, .sw-laps, .tm-list")) return; // botões e lista de voltas
   gesture = {
     id: e.pointerId,
@@ -398,7 +401,7 @@ const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 // ---------------- Proteção burn-in ----------------
 function applyBurnIn() {
-  if (!store.get().burnIn) {
+  if (!store.get().burnIn || free.isEditing()) {
     rootStyle.setProperty("--shift-x", "0px");
     rootStyle.setProperty("--shift-y", "0px");
     return;
@@ -409,11 +412,36 @@ function applyBurnIn() {
 }
 setInterval(applyBurnIn, BURN_IN_MS);
 
+// ---------------- Mostrador Interativo ----------------
+function applyFace() {
+  const s = store.get();
+  document.documentElement.dataset.face = s.face;
+  if (s.face === "interactive") free.mount();
+}
+
+/** Ícone do botão digital/analógico: no Interativo, segue o primeiro relógio da tela. */
+function applyClockType() {
+  const s = store.get();
+  let type = s.clock.type;
+  if (s.face === "interactive") type = s.interactive?.elements?.find((e) => e.type === "clock")?.opts?.type || "digital";
+  document.documentElement.dataset.clock = type;
+}
+
+function startEditing() {
+  if (locked) return;
+  if (store.get().face !== "interactive") store.set({ face: "interactive" });
+  if (store.get().tab !== "clock") store.set({ tab: "clock" });
+  hideUI();
+  rootStyle.setProperty("--shift-x", "0px");
+  rootStyle.setProperty("--shift-y", "0px");
+  requestAnimationFrame(() => { free.startEditing(); applyMirror(); });
+}
+
 // ---------------- Laço do relógio ----------------
 let lastMinute = -1;
 function tick() {
   const now = new Date();
-  updateFace(now);
+  if (store.get().face === "interactive") free.update(now); else updateFace(now);
   if (now.getMinutes() !== lastMinute) {
     lastMinute = now.getMinutes();
     applyTheme(now);
@@ -434,8 +462,9 @@ function loop() {
 
 // ---------------- Reação a mudanças nas configurações ----------------
 store.subscribe((s, patch) => {
-  if ("language" in patch) { applyLanguage(); mountFace(grid, true); timers.relabel(); pomodoro.relabel(); }
-  if ("clock" in patch) document.documentElement.dataset.clock = s.clock.type;
+  if ("language" in patch) { applyLanguage(); mountFace(grid, true); free.relabel?.(); timers.relabel(); pomodoro.relabel(); }
+  if ("clock" in patch || "interactive" in patch || "face" in patch) applyClockType();
+  if ("face" in patch) applyFace();
   if ("pomo" in patch) pomodoro.render();
   if ("location" in patch) weather.tick();
   if ("tab" in patch) applyTab();
@@ -446,6 +475,7 @@ store.subscribe((s, patch) => {
   if (["nightBrightness", "nightColor"].some((k) => k in patch)) applyTheme();
   if ("brightness" in patch) applyBrightness(s.brightness);
   if (["face", "custom", "clock", "infoPosition", "presets"].some((k) => k in patch)) mountFace(grid);
+  if (["face", "interactive", "language"].some((k) => k in patch) && s.face === "interactive") free.mount("language" in patch);
   relayout();
   tick();
 });
@@ -459,6 +489,13 @@ applyOrientation();
 applyBrightness(store.get().brightness);
 mountFace(grid, true);
 initPicker();
+free.init({
+  // movimento do dedo → coordenadas do app (com y para baixo)
+  mapPointerDelta: (dx, dy) => { const d = toAppDelta(dx, dy); return { dx: d.dx, dy: -d.dy }; },
+  exited: () => { applyMirror(); applyBurnIn(); applyClockType(); showUI(); },
+});
+applyFace();
+$("edit-button").addEventListener("click", startEditing);
 timers.init({
   changed: updateTabDots,
   finished: () => { if (store.get().tab !== "timer") store.set({ tab: "timer" }); },
@@ -470,10 +507,10 @@ pomodoro.init({
   finished: () => { if (store.get().tab !== "pomodoro") store.set({ tab: "pomodoro" }); },
 });
 pomodoro.mount($("pomodoro-view"));
-document.documentElement.dataset.clock = store.get().clock.type;
+applyClockType();
 applyTab();
 updateTabDots();
-settings.initSettings({ onClose: () => tick(), wakeLockState: () => wakeLockState });
+settings.initSettings({ onClose: () => tick(), wakeLockState: () => wakeLockState, editScreen: startEditing });
 weather.init();
 applyBurnIn();
 loop();
