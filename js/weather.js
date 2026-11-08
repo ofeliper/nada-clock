@@ -30,13 +30,29 @@ export function formatTemp(tempC, unit) {
   return `${Math.round(v)}°${unit}`;
 }
 
+const CURRENT = "temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,is_day,wind_speed_10m,precipitation";
+const DAILY = "temperature_2m_max,temperature_2m_min,precipitation_probability_max";
+
 async function fetchCurrent(lat, lon) {
-  const url = `${API}?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,is_day&timezone=auto`;
+  const url = `${API}?latitude=${lat}&longitude=${lon}&current=${CURRENT}&daily=${DAILY}&forecast_days=1&timezone=auto`;
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const json = await res.json();
   const c = json.current || {};
-  return { tempC: c.temperature_2m, code: c.weather_code, isDay: c.is_day === 1 };
+  const d = json.daily || {};
+  const first = (arr) => (Array.isArray(arr) ? arr[0] : null);
+  return {
+    tempC: c.temperature_2m,
+    feelsC: c.apparent_temperature,
+    humidity: c.relative_humidity_2m,
+    code: c.weather_code,
+    isDay: c.is_day === 1,
+    windKmh: c.wind_speed_10m,
+    precipMm: c.precipitation,
+    tmaxC: first(d.temperature_2m_max),
+    tminC: first(d.temperature_2m_min),
+    rainProb: first(d.precipitation_probability_max),
+  };
 }
 
 export async function update() {
@@ -65,6 +81,13 @@ export function disable() {
 
 export const refreshNow = () => update();
 
+/** Texto da condição do tempo a partir do código WMO (ex.: 65 → "Chuva forte"). */
+export function conditionKey(code, isDay = true) {
+  if (code == null) return null;
+  if ((code === 0 || code === 1) && !isDay) return `wx.${code}n`;
+  return `wx.${code}`;
+}
+
 /** Chamado periodicamente: atualiza se o dado estiver velho ou se a localização mudou. */
 export function tick() {
   if (!store.get().tempEnabled) return;
@@ -72,7 +95,7 @@ export function tick() {
   const loc = store.get().location;
   if (typeof loc?.lat !== "number") { if (status !== "nolocation") setStatus("nolocation"); return; }
   const cache = store.getWeatherCache();
-  const moved = !cache || cache.lat !== loc.lat || cache.lon !== loc.lon;
+  const moved = !cache || cache.lat !== loc.lat || cache.lon !== loc.lon || cache.feelsC === undefined; // sem os campos novos (v0.5.1): busca de novo
   const age = cache?.updatedAt ? Date.now() - cache.updatedAt : Infinity;
   const sinceError = Date.now() - lastErrorAt;
   if ((moved || age >= REFRESH_MS) && sinceError >= RETRY_MS) update();

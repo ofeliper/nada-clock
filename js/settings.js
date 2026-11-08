@@ -4,7 +4,7 @@ import * as weather from "./weather.js";
 import * as location from "./location.js";
 import { t, LANGUAGES, getLanguage, formatShortTime, formatDate } from "./i18n.js";
 import { THEMES, THEME_ORDER, resolveTheme } from "./themes.js";
-import { SLOT_TYPES, ZONES, zoneCity } from "./components.js";
+import { SLOT_TYPES, ZONES, zoneCity, WEATHER_EXTRAS } from "./components.js";
 import { TOKENS, expand } from "./tokens.js";
 import { SOUNDS, play as playSound, unlock as unlockSound } from "./sound.js";
 import { enhanceSelects, handleSelectTap } from "./picker.js";
@@ -12,7 +12,7 @@ import * as update from "./update.js";
 import * as timers from "./timer.js";
 import * as pomodoro from "./pomodoro.js";
 
-export const VERSION = "0.5.0";
+export const VERSION = "0.5.1";
 
 const DATE_FORMATS = ["auto", "dmy", "mdy", "ymd", "short", "long"];
 const SEPARATORS = ["/", "-", "."];
@@ -176,7 +176,26 @@ function render() {
     </div>
   `;
   enhanceSelects(body);
+  addClearButtons(body);
   body.scrollTop = scroll;
+}
+
+/** Botão "✕" no fim de cada campo de texto, para limpar com um toque. */
+function addClearButtons(container) {
+  container.querySelectorAll('input.field-input').forEach((input) => {
+    if (input.parentElement?.classList.contains("input-clear")) return;
+    const wrap = document.createElement("span");
+    wrap.className = "input-clear";
+    input.replaceWith(wrap);
+    wrap.appendChild(input);
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "clear-btn";
+    b.dataset.action = "clear-input";
+    b.setAttribute("aria-label", t("input.clear"));
+    b.textContent = "✕";
+    wrap.appendChild(b);
+  });
 }
 
 function swatch(th, pressed) {
@@ -270,6 +289,8 @@ function slotsSection(s) {
       break;
     case "temperature":
       if (!s.tempEnabled) rows += hintRow(t("comp.tempOff"), true);
+      rows += switchRow(null, t("temp.condition"), cfg.condition !== false, "", 'data-slotfield="condition"');
+      for (const k of WEATHER_EXTRAS) rows += switchRow(null, t("wxopt." + k), !!cfg[k], "", `data-slotfield="${k}"`);
       break;
     case "sun":
       if (!location.hasLocation()) rows += hintRow(t("comp.needsLocation"), true);
@@ -424,6 +445,7 @@ function temperatureSection(s, lang) {
     else hint = t("temp.never");
     const errorHint = status === "error" ? `<span class="row-hint warn">${t("temp.error")}</span>` : "";
     rows += selectRow("tempUnit", t("temp.unit"), [{ value: "C", label: "°C" }, { value: "F", label: "°F" }], unit);
+    rows += switchRow("tempCondition", t("temp.condition"), s.tempCondition, t("temp.conditionHint"));
     rows += `
       <div class="row">
         <span class="row-label"><span class="row-hint">${hint}</span>${errorHint}</span>
@@ -782,6 +804,15 @@ function onClick(e) {
       break;
     }
     case "temp-refresh": weather.refreshNow(); break;
+    case "clear-input": {
+      const input = btn.parentElement?.querySelector("input");
+      if (!input) break;
+      input.value = "";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      input.focus();
+      break;
+    }
 
     // presets
     case "preset-save": {

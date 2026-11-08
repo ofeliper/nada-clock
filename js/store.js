@@ -81,6 +81,7 @@ export const DEFAULTS = {
   dateSeparator: "/",      // / | - | .
   tempEnabled: false,
   tempUnit: null,          // null = padrão do idioma; "C" | "F"
+  tempCondition: true,     // mostra a condição junto: "17°C, chuva forte"
   location: DEFAULT_LOCATION,
   nightEnabled: false,
   nightStart: "22:00",

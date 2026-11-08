@@ -4,7 +4,7 @@
 
 Funciona como um app instalado na Tela de Início (PWA): tela cheia, tela sempre ligada, funciona offline.
 
-## Funcionalidades (v0.5.0)
+## Funcionalidades (v0.5.1)
 
 - Quatro abas: **Relógio**, **Timer**, **Cronômetro** e **Pomodoro** — troque pela barra do topo (aparece com um toque) ou deslizando para o lado
 - **Pomodoro**: foco, pausa curta e pausa longa a cada N focos, com durações configuráveis e início automático opcional
@@ -17,7 +17,7 @@ Funciona como um app instalado na Tela de Início (PWA): tela cheia, tela sempre
   - Arraste uma posição sobre outra para trocar — inclusive o relógio, que pode ir para qualquer lugar
   - Componentes: dia + data, dia da semana, data, temperatura, outro fuso, progresso (dia/semana/mês/ano), fase da lua, nascer/pôr do sol, contagem até uma data, texto livre
   - **Presets**: salve e reaplique layouts
-  - Texto livre com placeholders: `{HH} {hh} {mm} {ss} {ampm} {weekday} {wd} {day} {month} {monthName} {mon} {year} {date} {temp}`
+  - Texto livre com placeholders: `{HH} {hh} {mm} {ss} {ampm} {weekday} {wd} {day} {month} {monthName} {mon} {year} {date} {temp} {weather} {feels} {tmax} {tmin} {humidity} {rain}`
   - Cores personalizadas: fundo, principal e uma cor para horas, minutos e segundos
 - 7 paletas: **Sistema** (padrão; segue o modo claro/escuro do aparelho), Terminal, Âmbar, Neve, Gelo, Noturno e Papel (clara)
 - **Restaurar padrão** nas configurações
@@ -34,7 +34,9 @@ Funciona como um app instalado na Tela de Início (PWA): tela cheia, tela sempre
 - **Modo noturno** automático por horário (cor vermelha escura)
 - **Proteção contra burn-in**: o relógio se move alguns pixels a cada minuto
 - **Localização** em três modos: precisa (GPS, com permissão), aproximada pela internet (IP, sem permissão, via [GeoJS](https://www.geojs.io/)) ou cidade escolhida (busca do [Open-Meteo](https://open-meteo.com/en/docs/geocoding-api))
-- **Temperatura** (opcional) via [Open-Meteo](https://open-meteo.com) (CC BY 4.0), com °C/°F e horário da última atualização
+- **Temperatura** (opcional) via [Open-Meteo](https://open-meteo.com) (CC BY 4.0), com °C/°F, **condição do tempo** ("17°C, chuva forte") e horário da última atualização
+  - No Customizado: sensação térmica, máxima/mínima do dia, umidade, chance de chuva e vento
+  - Placeholders: `{weather} {feels} {tmax} {tmin} {humidity} {rain}`
 - **Nascer/pôr do sol** calculado no próprio aparelho
 - Idiomas: **Português (Brasil)** e **English (US)**, com detecção automática
 - Formatos de data: automático, DD/MM/AAAA, MM/DD/AAAA, ISO, por extenso, com escolha do separador

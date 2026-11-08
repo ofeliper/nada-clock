@@ -2,7 +2,7 @@
 // Cada componente: { mount(el), update(now), isEmpty?() }
 import * as store from "./store.js";
 import { t, formatDate, formatWeekday, getLanguage } from "./i18n.js";
-import { expand, currentTempText } from "./tokens.js";
+import { expand, tempWithCondition, weatherExtra } from "./tokens.js";
 
 const pad = (n) => String(n).padStart(2, "0");
 const esc = (str) => String(str).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -148,7 +148,7 @@ export function infoLine() {
     const parts = [];
     if (s.showWeekday) parts.push(formatWeekday(now));
     if (s.showDate) parts.push(formatDate(now, s.dateFormat, s.dateSeparator));
-    const temp = currentTempText();
+    const temp = tempWithCondition(s.tempCondition);
     if (temp) parts.push(temp);
     return parts.map(esc).join('<span class="dot">·</span>');
   };
@@ -170,7 +170,14 @@ export const weekdayDate = () => textComponent((now) => {
   return `${esc(formatWeekday(now))}<span class="dot">·</span>${esc(formatDate(now, s.dateFormat, s.dateSeparator))}`;
 });
 
-export const temperature = () => textComponent(() => esc(currentTempText()));
+/** Temperatura + extras opcionais (condição, sensação, mín/máx, umidade, chuva, vento). */
+export const WEATHER_EXTRAS = ["feels", "minmax", "humidity", "rain", "wind"];
+export const temperature = (opts = {}) => textComponent(() => {
+  const main = tempWithCondition(opts.condition !== false);
+  if (!main) return "";
+  const extras = WEATHER_EXTRAS.filter((k) => opts[k]).map((k) => weatherExtra(k)).filter(Boolean);
+  return [main, ...extras].map(esc).join('<span class="dot">·</span>');
+});
 
 export const freeText = (opts = {}, big = false) =>
   textComponent((now) => esc(expand(opts.text || "", now)), { className: big ? "comp-text comp-text-big" : "comp-text" });
@@ -355,7 +362,7 @@ export function createSlotComponent(cfg = {}) {
     case "weekdayDate": return weekdayDate();
     case "weekday": return weekday();
     case "date": return date();
-    case "temperature": return temperature();
+    case "temperature": return temperature(cfg);
     case "timezone": return timezone(cfg);
     case "progress": return progress(cfg);
     case "moon": return moon(cfg);
