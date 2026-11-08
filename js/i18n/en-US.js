@@ -223,7 +223,6 @@ export default {
   "face.minimalHint": "Clock + day and date (and temperature, if on). Adjust the clock below.",
   "face.customHint": "Build your face: choose what each position shows, move the clock and save presets.",
   "group.clock": "Clock",
-  "clock.swapHint": "Tip: the button next to the tabs switches between digital and analog without opening settings.",
   "info.position": "Position",
   "info.above": "Above the clock",
   "info.below": "Below the clock",
@@ -393,5 +392,11 @@ export default {
   "edit.align": "Align",
   "edit.align_left": "Left",
   "edit.align_center": "Center",
-  "edit.align_right": "Right"
+  "edit.align_right": "Right",
+  "mode.label": "Change face",
+  "mode.minimal-digital": "Minimal digital",
+  "mode.minimal-analog": "Minimal analog",
+  "mode.custom": "Custom",
+  "mode.interactive": "Interactive (beta)",
+  "clock.swapHint": "Tip: the four-squares button in the control bar changes the face without opening settings."
 };

@@ -46,6 +46,19 @@ export const DEFAULT_CUSTOM = {
  * Mostrador Interativo: elementos livres numa "tela" com proporção ar (largura/altura).
  * x, y = posição em % da tela; size = tamanho da fonte em % da largura da tela.
  */
+/** Modos da barra de controle: o Minimalista vem em duas versões (digital e analógico). */
+export const MODES = ["minimal-digital", "minimal-analog", "custom", "interactive"];
+
+export function currentMode(s = state) {
+  return s.face === "minimal" || !s.face ? `minimal-${s.clock?.type === "analog" ? "analog" : "digital"}` : s.face;
+}
+
+export function setMode(mode) {
+  if (mode === "minimal-digital" || mode === "minimal-analog") {
+    set({ face: "minimal", clock: { ...state.clock, type: mode === "minimal-analog" ? "analog" : "digital" } });
+  } else if (MODES.includes(mode)) set({ face: mode });
+}
+
 export function defaultInteractive(clock = DEFAULT_CLOCK) {
   return {
     ar: 844 / 390,
@@ -100,7 +113,7 @@ export const DEFAULT_LOCATION = {
 
 export const DEFAULTS = {
   language: "auto",        // auto | pt-BR | en-US
-  face: "minimal",         // minimal | custom | interactive
+  face: "interactive",     // minimal | custom | interactive (Interativo é o padrão desde a v0.7.1)
   theme: "system",         // system | terminal | amber | snow | ice | night | paper
   clock: DEFAULT_CLOCK,
   showDate: true,

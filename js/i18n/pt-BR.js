@@ -223,7 +223,6 @@ export default {
   "face.minimalHint": "Relógio + dia e data (e temperatura, se ativada). Ajuste o relógio logo abaixo.",
   "face.customHint": "Monte o mostrador: escolha o que aparece em cada posição, mova o relógio e salve presets.",
   "group.clock": "Relógio",
-  "clock.swapHint": "Dica: o botão ao lado das abas troca entre digital e analógico sem abrir as configurações.",
   "info.position": "Posição",
   "info.above": "Acima do relógio",
   "info.below": "Abaixo do relógio",
@@ -393,5 +392,11 @@ export default {
   "edit.align": "Alinhar",
   "edit.align_left": "Esq.",
   "edit.align_center": "Centro",
-  "edit.align_right": "Dir."
+  "edit.align_right": "Dir.",
+  "mode.label": "Trocar mostrador",
+  "mode.minimal-digital": "Minimalista digital",
+  "mode.minimal-analog": "Minimalista analógico",
+  "mode.custom": "Customizado",
+  "mode.interactive": "Interativo (beta)",
+  "clock.swapHint": "Dica: o botão de quadradinhos na barra de controle troca o mostrador sem abrir as configurações."
 };

@@ -4,7 +4,7 @@
 
 Funciona como um app instalado na Tela de Início (PWA): tela cheia, tela sempre ligada, funciona offline.
 
-## Funcionalidades (v0.7.0)
+## Funcionalidades (v0.7.1)
 
 - Quatro abas: **Relógio**, **Timer**, **Cronômetro** e **Pomodoro** — troque pela barra do topo (aparece com um toque) ou deslizando para o lado
 - **Timer**: vários ao mesmo tempo, com nome (ex.: "macarrão", "forno")
@@ -13,14 +13,16 @@ Funciona como um app instalado na Tela de Início (PWA): tela cheia, tela sempre
 - **Timer**: ajuste de horas/minutos/segundos (segure para repetir), atalhos (1–60 min), pausa, +1 min e alarme; continua certo em segundo plano
 - **Cronômetro**: voltas (parcial e total), pausa e zerar; o estado fica salvo
 - Relógio **digital** (12/24h, segundos, dois-pontos piscando, 6 fontes incluindo **LED de 7 segmentos**, estilo **plaquinha/flip**) ou **analógico** — as opções valem para os dois mostradores
-- Mostrador **Minimalista**: relógio + dia e data (acima ou abaixo, coladinhos no relógio)
+- **Barra de controle** (aparece com um toque): girar, **mostradores** (Minimalista digital, Minimalista analógico, Customizado, Interativo), editar a tela, abas, bloquear e configurações
+- Mostrador **Minimalista** (digital ou analógico): relógio + dia e data (acima ou abaixo, coladinhos no relógio)
 - Mostrador **Customizado**: 11 posições (bordas de cima e de baixo, logo acima/abaixo do relógio e laterais)
   - Arraste uma posição sobre outra para trocar — inclusive o relógio, que pode ir para qualquer lugar
   - Componentes: dia + data, dia da semana, data, temperatura, outro fuso, progresso (dia/semana/mês/ano), fase da lua, nascer/pôr do sol, contagem até uma data, texto livre
   - **Presets**: salve e reaplique layouts
   - Texto livre com placeholders: `{HH} {hh} {mm} {ss} {ampm} {weekday} {wd} {day} {month} {monthName} {mon} {year} {date} {temp} {weather} {feels} {tmax} {tmin} {humidity} {rain}`
   - Cores personalizadas: fundo, principal e uma cor para horas, minutos e segundos
-- Mostrador **Interativo (beta)**: monte a tela à mão, direto no relógio
+- Mostrador **Interativo (beta)**, o padrão: monte a tela à mão, direto no relógio
+  - Na edição, a tela aparece reduzida e as opções ficam numa gaveta ao lado (deitado) ou embaixo (em pé), sem cobrir nada
   - Toque no lápis da barra (ou em Configurações → Editar a tela)
   - **＋ Adicionar** qualquer componente (inclusive mais de um relógio) e arraste para onde quiser
   - "Ímã": o elemento gruda no centro, nas margens e no alinhamento dos outros, com linhas-guia

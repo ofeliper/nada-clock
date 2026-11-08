@@ -44,7 +44,7 @@ let mountedKey = "";
 let editing = false;
 let draft = null;              // cópia do layout durante a edição
 let selectedId = null;
-let panelCollapsed = false;
+let scale = 1;                 // na edição, a tela inteira aparece reduzida ao lado da gaveta
 let resetArmed = false;
 let mapDelta = (dx, dy) => ({ dx, dy });   // tela física → coordenadas do app (giro forçado)
 let onExit = null;
@@ -67,10 +67,10 @@ export const isEditing = () => editing;
 
 export function init({ mapPointerDelta, exited }) {
   root = document.getElementById("free");
-  root.innerHTML = '<div class="free-canvas"></div><div class="guide guide-v" hidden></div><div class="guide guide-h" hidden></div>';
+  root.innerHTML = '<div class="free-canvas"></div>';
   canvas = root.querySelector(".free-canvas");
-  guideV = root.querySelector(".guide-v");
-  guideH = root.querySelector(".guide-h");
+  guideV = Object.assign(document.createElement("div"), { className: "guide guide-v", hidden: true });
+  guideH = Object.assign(document.createElement("div"), { className: "guide guide-h", hidden: true });
   if (mapPointerDelta) mapDelta = mapPointerDelta;
   onExit = exited;
   bindEditing();
@@ -97,6 +97,7 @@ export function mount(force = false) {
     el.className = "iel";
     el.dataset.id = data.id;
     el.dataset.type = data.type;
+    el.dataset.placeholder = label(data.type);
     el.tabIndex = editing ? 0 : -1;
     const body = document.createElement("div");
     body.className = "iel-body";
@@ -106,6 +107,7 @@ export function mount(force = false) {
     canvas.appendChild(el);
     mounted.set(data.id, { el, comp });
   }
+  canvas.append(guideV, guideH);
   fit();
   update(new Date());
   markSelected();
@@ -118,11 +120,28 @@ export function fit() {
   if (!fw || !fh) return;
   if (!editing && orient() !== mountedOrient) { mount(true); return; }
   const ar = layout().ar || fw / fh;
-  let cw, ch;
-  if (editing) { cw = fw; ch = fh; }
-  else if (fw / fh > ar) { ch = fh; cw = fh * ar; }
+  let cw, ch, left, top;
+  scale = 1;
+  if (editing) {
+    // tela inteira, reduzida para caber ao lado (deitado) ou acima (em pé) da gaveta
+    cw = fw; ch = fh;
+    const bottom = orient() === "port";
+    document.documentElement.classList.toggle("edit-bottom", bottom);
+    const drawer = document.querySelector(".edit-drawer");
+    const gap = 14;
+    const aw = bottom ? fw : fw - (drawer?.offsetWidth || 0) - gap;
+    const ah = bottom ? fh - (drawer?.offsetHeight || 0) - gap : fh;
+    scale = Math.min(1, aw / fw, ah / fh) * 0.97;
+    left = (aw - fw * scale) / 2;
+    top = (ah - fh * scale) / 2;
+  } else if (fw / fh > ar) { ch = fh; cw = fh * ar; }
   else { cw = fw; ch = fw / ar; }
-  Object.assign(canvas.style, { width: cw + "px", height: ch + "px", left: (fw - cw) / 2 + "px", top: (fh - ch) / 2 + "px" });
+  if (!editing) { left = (fw - cw) / 2; top = (fh - ch) / 2; }
+  Object.assign(canvas.style, {
+    width: cw + "px", height: ch + "px", left: left + "px", top: top + "px",
+    transform: scale === 1 ? "" : `scale(${scale})`,
+  });
+  canvas.style.setProperty("--edit-scale", scale);
   canvas.dataset.cw = cw;
   canvas.dataset.ch = ch;
   for (const data of layout().elements) styleEl(data, cw);
@@ -145,7 +164,7 @@ function styleEl(data, cw = Number(canvas.dataset.cw)) {
     for (const v of ["--fg", "--c-hours", "--c-minutes", "--c-seconds", "--c-sep"]) el.style.setProperty(v, data.color);
     el.style.color = data.color;
   }
-  el.className = "iel" + (data.font ? " font-" + data.font : "") + (data.id === selectedId && editing ? " selected" : "");
+  el.className = "iel" + (data.font ? " font-" + data.font : "") + (data.id === selectedId && editing ? " selected" : "") + (el.classList.contains("is-empty") ? " is-empty" : "");
 }
 
 /** Idioma trocado: redesenha os textos do editor. */
@@ -154,7 +173,11 @@ export function relabel() {
 }
 
 export function update(now = new Date()) {
-  for (const { comp } of mounted.values()) comp?.update(now);
+  for (const { el, comp } of mounted.values()) {
+    comp?.update(now);
+    // na edição, um elemento sem conteúdo (ex.: temperatura desligada) mostra o nome, para poder ser tocado
+    el.classList.toggle("is-empty", editing && !el.textContent.trim() && !el.querySelector("svg"));
+  }
 }
 
 /** Botão digital ⇄ analógico da barra: troca todos os relógios do mostrador. */
@@ -191,13 +214,13 @@ export function startEditing() {
   draft = src;
   editing = true;
   selectedId = null;
-  panelCollapsed = false;
   resetArmed = false;
   document.documentElement.classList.add("editing");
+  document.documentElement.classList.toggle("edit-bottom", editOrient === "port");
   document.getElementById("edit-ui").hidden = false;
-  mount(true);
   renderPanel();
   renderToolbar();
+  mount(true);
 }
 
 function finish(save) {
@@ -206,7 +229,7 @@ function finish(save) {
   editing = false;
   draft = null;
   selectedId = null;
-  document.documentElement.classList.remove("editing");
+  document.documentElement.classList.remove("editing", "edit-bottom");
   document.getElementById("edit-ui").hidden = true;
   closeAddSheet();
   hideGuides();
@@ -330,8 +353,8 @@ function keepInside(id, x) {
 function showGuides(x, y) {
   guideV.hidden = x === null;
   guideH.hidden = y === null;
-  if (x !== null) guideV.style.left = canvas.offsetLeft + (x / 100) * canvas.offsetWidth + "px";
-  if (y !== null) guideH.style.top = canvas.offsetTop + (y / 100) * canvas.offsetHeight + "px";
+  if (x !== null) guideV.style.left = x + "%";
+  if (y !== null) guideH.style.top = y + "%";
 }
 function hideGuides() { if (guideV) { guideV.hidden = true; guideH.hidden = true; } }
 
@@ -375,8 +398,8 @@ function bindEditing() {
     if (!drag.moved && Math.hypot(dx, dy) < 4) return;
     drag.moved = true;
     const data = findEl(drag.id);
-    let x = clamp(drag.x0 + (dx / canvas.offsetWidth) * 100, 0, 100);
-    let y = clamp(drag.y0 + (dy / canvas.offsetHeight) * 100, 0, 100);
+    let x = clamp(drag.x0 + (dx / (canvas.offsetWidth * scale)) * 100, 0, 100);
+    let y = clamp(drag.y0 + (dy / (canvas.offsetHeight * scale)) * 100, 0, 100);
     const { xs, ys } = snapTargets(drag.id, data);
     const sx = snapValue(x, xs), sy = snapValue(y, ys);
     if (sx !== null) x = sx;
@@ -432,7 +455,6 @@ function renderToolbar() {
   toolbar.innerHTML = `
     <button type="button" class="tb-btn" data-ed="add">${ICON_PLUS}<span>${t("edit.add")}</span></button>
     <button type="button" class="tb-btn ${resetArmed ? "danger" : ""}" data-ed="reset">${ICON_RESET}<span>${resetArmed ? t("edit.resetConfirm") : t("edit.reset")}</span></button>
-    <span class="tb-sep"></span>
     <button type="button" class="tb-btn" data-ed="cancel"><span>${t("edit.cancel")}</span></button>
     <button type="button" class="tb-btn primary" data-ed="done">${ICON_CHECK}<span>${t("edit.done")}</span></button>`;
 }
@@ -463,18 +485,13 @@ function renderPanel() {
   if (!panel) return;
   const data = selectedId && findEl(selectedId);
   if (!editing || !data) {
-    panel.hidden = !editing;
-    panel.classList.remove("collapsed");
     panel.innerHTML = editing ? `<div class="ep-empty">${t("edit.hint")}</div>` : "";
     return;
   }
-  panel.hidden = false;
-  panel.classList.toggle("collapsed", panelCollapsed);
-  panel.classList.toggle("at-top", data.y > 50);   // em pé: o painel sai de cima do elemento
   const o = data.opts || {};
   let html = `
     <div class="ep-head">
-      <button type="button" class="ep-title" data-ed="collapse" aria-expanded="${!panelCollapsed}">${esc(label(data.type))} <span aria-hidden="true">${panelCollapsed ? "▴" : "▾"}</span></button>
+      <span class="ep-title">${esc(label(data.type))}</span>
       <span class="ep-actions">
         <button type="button" class="ep-icon" data-ed="front" aria-label="${esc(t("edit.front"))}" title="${esc(t("edit.front"))}">${ICON_FRONT}</button>
         <button type="button" class="ep-icon" data-ed="duplicate" aria-label="${esc(t("edit.duplicate"))}" title="${esc(t("edit.duplicate"))}">${ICON_COPY}</button>
@@ -594,7 +611,6 @@ function onClick(e) {
       break;
     case "cancel": finish(false); break;
     case "done": finish(true); break;
-    case "collapse": panelCollapsed = !panelCollapsed; renderPanel(); break;
     case "delete": removeSelected(); break;
     case "duplicate": duplicateSelected(); break;
     case "front": bringToFront(); break;

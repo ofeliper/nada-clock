@@ -10,7 +10,7 @@ import * as timers from "./timer.js";
 import * as pomodoro from "./pomodoro.js";
 import * as location from "./location.js";
 import * as update from "./update.js";
-import { initPicker } from "./picker.js";
+import { initPicker, openPicker } from "./picker.js";
 import * as share from "./share.js";
 import * as free from "./free.js";
 
@@ -283,11 +283,15 @@ window.addEventListener("resize", () => applyOrientation(false));
 window.addEventListener("orientationchange", () => setTimeout(() => applyOrientation(false), 250));
 
 // troca rápida digital ⇄ analógico (só na aba Relógio)
+// botão de mostradores: escolhe o modo sem abrir as configurações
 $("face-button").addEventListener("click", () => {
-  if (store.get().face === "interactive") { free.toggleClockType(); showUI(); return; }
-  const c = store.get().clock;
-  store.setClock({ type: c.type === "analog" ? "digital" : "analog" });
-  showUI();
+  hideUI();
+  openPicker({
+    title: t("face.label"),
+    options: store.MODES.map((m) => ({ value: m, label: t("mode." + m) })),
+    value: store.currentMode(),
+    onSelect: (m) => store.setMode(m),
+  });
 });
 
 $("rotate-button").addEventListener("click", () => {

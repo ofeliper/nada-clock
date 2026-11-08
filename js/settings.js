@@ -15,7 +15,7 @@ import * as share from "./share.js";
 
 const REPO = "https://github.com/ofeliper/nada-clock";
 
-export const VERSION = "0.7.0";
+export const VERSION = "0.7.1";
 
 const DATE_FORMATS = ["auto", "dmy", "mdy", "ymd", "short", "long"];
 const SEPARATORS = ["/", "-", "."];
@@ -112,12 +112,10 @@ function render() {
 
   body.innerHTML = `
     ${group(t("group.display"), `
-      <div class="segmented" role="group" aria-label="${t("face.label")}">
-        <button type="button" data-action="face" data-value="minimal" aria-pressed="${minimal}">${t("face.minimal")}</button>
-        <button type="button" data-action="face" data-value="custom" aria-pressed="${custom}">${t("face.custom")}</button>
-        <button type="button" data-action="face" data-value="interactive" aria-pressed="${inter}">${t("face.interactive")}</button>
+      <div class="segmented grid2" role="group" aria-label="${t("face.label")}">
+        ${store.MODES.map((m) => `<button type="button" data-action="mode" data-value="${m}" aria-pressed="${store.currentMode(s) === m}">${t("mode." + m)}</button>`).join("")}
       </div>
-      <div class="row"><span class="row-label"><span class="row-hint">${t(custom ? "face.customHint" : inter ? "face.interactiveHint" : "face.minimalHint")}</span></span>
+      <div class="row"><span class="row-label"><span class="row-hint">${t(custom ? "face.customHint" : inter ? "face.interactiveHint" : "face.minimalHint")}</span><span class="row-hint">${t("clock.swapHint")}</span></span>
         ${inter ? `<button type="button" class="btn" data-action="edit-screen">${t("edit.open")}</button>` : ""}</div>
       <div class="swatches" role="group" aria-label="${t("theme.label")}">
         ${THEME_ORDER.map((th) => swatch(th, s.theme === th)).join("")}
@@ -129,7 +127,7 @@ function render() {
       ], s.rotateDir) : ""}
     `)}
 
-    ${inter ? "" : group(t("group.clock"), clockSection(s))}
+    ${inter ? "" : group(t("group.clock"), clockSection(s, custom))}
 
     ${custom ? slotsSection(s) + presetsSection(s) + colorsSection(s) : ""}
 
@@ -258,14 +256,14 @@ function dateFormatRows(s) {
 }
 
 // ---------- Relógio (vale para os dois mostradores) ----------
-function clockSection(s) {
+function clockSection(s, custom) {
   const c = s.clock;
-  let rows = `
+  // no Minimalista o tipo vem do modo (digital ou analógico); no Customizado escolhe aqui
+  let rows = custom ? `
     <div class="segmented" role="group" aria-label="${t("center.type")}">
       <button type="button" data-action="clock-type" data-value="digital" aria-pressed="${c.type === "digital"}">${t("center.digital")}</button>
       <button type="button" data-action="clock-type" data-value="analog" aria-pressed="${c.type === "analog"}">${t("center.analog")}</button>
-    </div>
-    <div class="row"><span class="row-label"><span class="row-hint">${t("clock.swapHint")}</span></span></div>`;
+    </div>` : "";
   if (c.type === "digital") {
     rows += switchRow(null, t("center.hour12"), c.hour12, "", 'data-clock="hour12"');
     rows += switchRow(null, t("center.seconds"), c.seconds, "", 'data-clock="seconds"');
@@ -857,6 +855,7 @@ function onClick(e) {
   switch (action) {
     case "theme": store.set({ theme: value }); break;
     case "face": store.set({ face: value }); break;
+    case "mode": store.setMode(value); break;
     case "edit-screen": close(); onEditScreen?.(); break;
     case "clock-type": store.setClock({ type: value }); break;
     case "slot": if (!dragJustEnded) { selectedSlot = value; render(); } break;

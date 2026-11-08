@@ -206,7 +206,6 @@ export default {
   "face.minimalHint": "Reloj + día y fecha (y temperatura, si está activada). Ajusta el reloj abajo.",
   "face.customHint": "Arma tu esfera: elige qué muestra cada posición, mueve el reloj y guarda ajustes predefinidos.",
   "group.clock": "Reloj",
-  "clock.swapHint": "Consejo: el botón junto a las pestañas cambia entre digital y analógico sin abrir los ajustes.",
   "info.position": "Posición",
   "info.above": "Encima del reloj",
   "info.below": "Debajo del reloj",
@@ -372,5 +371,11 @@ export default {
   "edit.align": "Alinear",
   "edit.align_left": "Izq.",
   "edit.align_center": "Centro",
-  "edit.align_right": "Der."
+  "edit.align_right": "Der.",
+  "mode.label": "Cambiar esfera",
+  "mode.minimal-digital": "Minimalista digital",
+  "mode.minimal-analog": "Minimalista analógica",
+  "mode.custom": "Personalizada",
+  "mode.interactive": "Interactiva (beta)",
+  "clock.swapHint": "Consejo: el botón de cuadritos en la barra de control cambia la esfera sin abrir los ajustes."
 };

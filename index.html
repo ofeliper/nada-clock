@@ -80,9 +80,8 @@
         <path d="M3 13.5a9 9 0 0 0 8 7.4"/><path d="M8.6 18.4l2.4 2.5-2.6 2.1"/>
       </svg>
     </button>
-    <button id="face-button" class="bar-btn" type="button" data-i18n-aria="faceSwap.label" aria-label="Digital/analógico">
-      <svg class="ic-analog" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-      <svg class="ic-digital" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="3"/><path d="M7 10v4M10 10v4M14 10v4h3v-4h-3"/></svg>
+    <button id="face-button" class="bar-btn" type="button" data-i18n-aria="mode.label" aria-label="Trocar mostrador" aria-haspopup="listbox">
+      <svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.8"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.8"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.8"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.8"/></svg>
     </button>
     <button id="edit-button" class="bar-btn" type="button" data-i18n-aria="edit.open" aria-label="Editar a tela">
       <svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4Z"/><path d="M13.5 6.5l4 4"/></svg>
@@ -105,8 +104,10 @@
 
   <!-- Editor do mostrador Interativo -->
   <div id="edit-ui" class="edit-ui" hidden>
-    <div class="edit-panel" hidden></div>
-    <div class="edit-toolbar" role="toolbar"></div>
+    <aside class="edit-drawer">
+      <div class="edit-toolbar" role="toolbar"></div>
+      <div class="edit-panel"></div>
+    </aside>
     <div class="edit-add" hidden></div>
   </div>
 
