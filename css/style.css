@@ -45,6 +45,7 @@
 [data-theme="snow"]     { --fg: #e8e8e8; }
 [data-theme="ice"]      { --fg: #5ac8fa; }
 [data-theme="night"]    { --fg: #b3261e; --fg-dim: 0.6; }
+[data-theme="paper"]    { --bg: #f4f1ea; --fg: #2b2b2b; --fg-dim: 0.6; }
 
 /* ---------- Base ---------- */
 *, *::before, *::after { box-sizing: border-box; }
@@ -80,14 +81,25 @@ body {
     max(env(safe-area-inset-left), 8px);
   touch-action: none;           /* gestos tratados pelo app */
   cursor: default;
+  background: var(--bg);
+}
+
+/* Brilho: uma camada preta por cima de tudo (funciona em fundo escuro e claro) */
+.stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: calc(1 - var(--brightness));
+  pointer-events: none;
+  transition: opacity 0.15s linear;
 }
 
 .shift {
   width: 100%;
   height: 100%;
-  opacity: var(--brightness);
   transform: translate(var(--shift-x), var(--shift-y));
-  transition: transform 3s ease-in-out, opacity 0.15s linear;
+  transition: transform 3s ease-in-out;
 }
 
 /* ---------- Grade 3x3 ---------- */
@@ -107,8 +119,10 @@ body {
   overflow: hidden;
   display: flex;
   container-type: size;
-  font-size: clamp(11px, min(30cqh, 12cqw), 26px);
   line-height: 1.2;
+  /* tamanho do texto dos componentes, relativo ao próprio slot
+     (as unidades cq resolvem no filho, que tem o slot como container) */
+  --slot-font: clamp(11px, min(40cqh, 12cqw), 26px);
 }
 
 /* alinhamento: cada slot "gruda" no seu canto/borda */
@@ -137,12 +151,76 @@ body {
   /* "HH:MM:SS" ocupa ~4.6em de largura */
   font-size: min(20cqw, 62cqh);
 }
+.clock-digital.size-hm       { font-size: min(32cqw, 70cqh); }
+.clock-digital.size-hm-ampm  { font-size: min(25cqw, 66cqh); }
+.clock-digital.size-hms-ampm { font-size: min(16.5cqw, 58cqh); }
+
 .clock-digital .hh  { color: var(--c-hours); }
 .clock-digital .mm  { color: var(--c-minutes); }
 .clock-digital .ss  { color: var(--c-seconds); }
-.clock-digital .sep { color: var(--c-sep); opacity: 0.85; padding: 0 0.02em; position: relative; top: -0.06em; }
+.clock-digital .sep { color: var(--c-sep); opacity: 0.85; padding: 0 0.02em; position: relative; top: -0.06em; transition: opacity 0.25s; }
+.clock-digital .sep.dim { opacity: 0.15; }
+.clock-digital .ampm { font-size: 0.26em; font-weight: 500; letter-spacing: 0.06em; margin-left: 0.35em; color: var(--c-hours); opacity: 0.8; }
+
+/* fontes do relógio digital */
+.clock-digital.font-thin    { font-weight: 200; }
+.clock-digital.font-regular { font-weight: 400; }
+.clock-digital.font-bold    { font-weight: 700; letter-spacing: -0.03em; }
+.clock-digital.font-mono    { font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Roboto Mono", monospace; font-weight: 300; letter-spacing: -0.04em; }
+.clock-digital.font-rounded { font-family: ui-rounded, "SF Pro Rounded", "Nunito", var(--font-clock); font-weight: 500; }
+
+/* relógio analógico */
+.clock-analog { width: min(100cqw, 100cqh); height: min(100cqw, 100cqh); overflow: visible; }
+.clock-analog .face  { fill: none; stroke: var(--fg); stroke-width: 2; opacity: 0.35; }
+.clock-analog .ticks { stroke: var(--fg); stroke-linecap: round; opacity: 0.8; }
+.clock-analog .hand  { stroke-linecap: round; }
+.clock-analog .hand-h { stroke: var(--c-hours); stroke-width: 7; }
+.clock-analog .hand-m { stroke: var(--c-minutes); stroke-width: 4.5; }
+.clock-analog .hand-s { stroke: var(--c-seconds); stroke-width: 2; }
+.clock-analog .hub   { fill: var(--c-seconds); }
+.slot[data-slot="C"][data-type="analog"] { padding: 2%; }
+
+/* componentes de texto dos slots */
+.comp-text {
+  font-size: var(--slot-font);
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  opacity: var(--fg-dim);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  max-width: 100%;
+  padding: 0.15em 0.3em;
+}
+.comp-text .dot { opacity: 0.6; padding: 0 0.4em; }
+.comp-text .strong { font-weight: 600; font-variant-numeric: tabular-nums; }
+.comp-text-big {
+  font-size: min(11cqw, 40cqh);
+  font-weight: 300;
+  opacity: 1;
+  font-variant-numeric: tabular-nums;
+}
+/* nas colunas laterais, o texto pode quebrar linha */
+.slot[data-slot="L"] .comp-text, .slot[data-slot="R"] .comp-text { white-space: normal; }
+
+.comp-progress {
+  font-size: var(--slot-font);
+  display: flex; flex-direction: column; gap: 0.35em; width: min(14em, 100%);
+  padding: 0.15em 0.3em; opacity: var(--fg-dim);
+}
+.slot[data-slot="T"] .comp-progress, .slot[data-slot="B"] .comp-progress, .slot[data-slot="C"] .comp-progress { align-items: center; }
+.slot[data-slot="TR"] .comp-progress, .slot[data-slot="R"] .comp-progress, .slot[data-slot="BR"] .comp-progress { align-items: flex-end; }
+.comp-progress .p-label { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.comp-progress .p-bar { display: block; width: 100%; height: 0.28em; border-radius: 1em; background: color-mix(in srgb, var(--fg) 25%, transparent); overflow: hidden; }
+.comp-progress .p-fill { display: block; height: 100%; background: var(--fg); border-radius: 1em; }
+
+.comp-moon { font-size: var(--slot-font); display: flex; align-items: center; gap: 0.45em; padding: 0.15em 0.3em; opacity: var(--fg-dim); white-space: nowrap; }
+.moon-icon { width: 1.3em; height: 1.3em; flex: none; }
+.moon-dark { fill: none; stroke: var(--fg); stroke-width: 1.2; opacity: 0.6; }
+.moon-lit  { fill: var(--fg); }
 
 .info-line {
+  font-size: var(--slot-font);
   font-weight: 400;
   letter-spacing: 0.04em;
   opacity: var(--fg-dim);
@@ -326,5 +404,68 @@ select { padding-right: 26px; background-image: linear-gradient(45deg, transpare
 .notice strong { color: var(--ui-text); }
 .notice-actions { display: flex; gap: 8px; margin-top: 10px; }
 
+.boot-error {
+  position: fixed; inset: 0; z-index: 50; overflow-y: auto;
+  display: flex; flex-direction: column; justify-content: center; gap: 18px;
+  padding: max(env(safe-area-inset-top), 24px) 24px 24px; max-width: 640px; margin: 0 auto;
+  color: var(--ui-text); font: 15px/1.55 var(--font-ui); -webkit-user-select: text; user-select: text;
+}
+.boot-error p { margin: 0; }
+.boot-error p + p { color: var(--ui-text-2); }
+.boot-error code { background: #1c1c1e; padding: 1px 6px; border-radius: 5px; font-size: 13.5px; }
+
 .about { margin-top: 22px; text-align: center; font-size: 12px; color: var(--ui-text-2); line-height: 1.6; }
 .about b { color: var(--ui-text); letter-spacing: 0.08em; }
+
+/* ---------- v0.2: editor do Customizado ---------- */
+.settings-body input, .settings-body textarea { -webkit-user-select: text; user-select: text; }
+
+.swatch-chip.chip-system { background: linear-gradient(135deg, #000 0 50%, #f4f1ea 50% 100%); color: transparent; position: relative; }
+.swatch-chip.chip-system::after { content: "A"; position: absolute; inset: 0; display: grid; place-items: center; font: 600 15px/1 var(--font-ui); color: #8e8e93; }
+
+.segmented { display: flex; gap: 4px; padding: 4px; margin: 12px 14px; background: #2c2c2e; border-radius: 10px; }
+.segmented button {
+  flex: 1; border: 0; border-radius: 7px; padding: 8px 6px; background: transparent; color: var(--ui-text-2);
+  font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.segmented button[aria-pressed="true"] { background: #48484a; color: var(--ui-text); }
+
+.slot-grid {
+  display: grid; grid-template-columns: 1fr 2.2fr 1fr; grid-template-rows: 42px 64px 42px;
+  gap: 4px; margin: 12px 14px; padding: 4px; border-radius: 10px; background: #000;
+}
+.slot-grid button {
+  border: 1px solid #3a3a3c; border-radius: 6px; background: #141416; color: var(--ui-text-2);
+  font: inherit; font-size: 11px; line-height: 1.15; padding: 2px 3px; cursor: pointer; overflow: hidden;
+  display: grid; place-items: center; text-align: center;
+}
+.slot-grid button.filled { color: var(--ui-text); background: #1f2a22; border-color: #2f4a35; }
+.slot-grid button[aria-pressed="true"] { border: 2px solid #0a84ff; color: var(--ui-text); }
+.slot-grid button:disabled { opacity: 0.45; cursor: default; font-size: 15px; }
+
+.field-input {
+  flex: 1; min-width: 0; max-width: 62%; background: #2c2c2e; color: var(--ui-text); border: 0; border-radius: 8px;
+  padding: 8px 10px; font: inherit; font-size: 15px;
+}
+.row-stack { flex-direction: column; align-items: stretch; }
+.row-stack .field-input { max-width: none; width: 100%; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  border: 0; border-radius: 999px; padding: 5px 9px; background: #2c2c2e; color: var(--ui-text);
+  font: 12.5px/1 ui-monospace, "SF Mono", Menlo, monospace; cursor: pointer;
+}
+.preview { font-size: 13px; color: var(--ui-text-2); }
+.preview b { color: var(--ui-text); font-weight: 500; }
+
+input[type="color"] {
+  -webkit-appearance: none; appearance: none; width: 44px; height: 32px; border: 1px solid #48484a;
+  border-radius: 8px; padding: 0; background: none; cursor: pointer;
+}
+input[type="color"]::-webkit-color-swatch-wrapper { padding: 3px; }
+input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 5px; }
+input[type="color"]::-moz-color-swatch { border: 0; border-radius: 5px; }
+input[type="date"] { appearance: none; -webkit-appearance: none; background: #2c2c2e; color: var(--ui-text); border: 0; border-radius: 8px; padding: 7px 10px; font: inherit; font-size: 15px; }
+
+.btn.danger { background: transparent; color: var(--ui-danger); padding-left: 0; }
+.btn.danger.confirm { background: var(--ui-danger); color: #fff; padding-left: 12px; }

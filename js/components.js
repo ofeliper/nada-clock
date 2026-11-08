@@ -1,0 +1,291 @@
+// Componentes que podem ocupar os slots da grade 3x3.
+// Cada componente: { mount(el), update(now), isEmpty?() }
+import * as store from "./store.js";
+import { t, formatDate, formatWeekday, getLanguage } from "./i18n.js";
+import { expand, currentTempText } from "./tokens.js";
+
+const pad = (n) => String(n).padStart(2, "0");
+const esc = (str) => String(str).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+/** Helper para componentes que são só uma linha de texto. */
+function textComponent(render, { className = "comp-text" } = {}) {
+  let el;
+  let last = null;
+  return {
+    mount(target) {
+      el = document.createElement("div");
+      el.className = className;
+      target.replaceChildren(el);
+      last = null;
+    },
+    update(now) {
+      const html = render(now);
+      if (html !== last) { el.innerHTML = html; last = html; }
+    },
+    isEmpty() {
+      return render(new Date()) === "";
+    },
+  };
+}
+
+// ---------------- Relógio digital ----------------
+export function clockDigital(opts = {}) {
+  const { hour12 = false, seconds = true, blink = false, font = "thin" } = opts;
+  let els;
+  return {
+    mount(el) {
+      const size = seconds ? (hour12 ? "size-hms-ampm" : "size-hms") : (hour12 ? "size-hm-ampm" : "size-hm");
+      el.innerHTML = `<div class="clock-digital font-${font} ${size}" role="timer">`
+        + `<span class="hh"></span><span class="sep">:</span><span class="mm"></span>`
+        + (seconds ? `<span class="sep">:</span><span class="ss"></span>` : "")
+        + (hour12 ? `<span class="ampm"></span>` : "")
+        + `</div>`;
+      els = {
+        hh: el.querySelector(".hh"),
+        mm: el.querySelector(".mm"),
+        ss: el.querySelector(".ss"),
+        ampm: el.querySelector(".ampm"),
+        seps: el.querySelectorAll(".sep"),
+      };
+    },
+    update(now) {
+      let h = now.getHours();
+      if (hour12) {
+        els.ampm.textContent = h < 12 ? "AM" : "PM";
+        h = h % 12 || 12;
+      }
+      els.hh.textContent = pad(h);
+      els.mm.textContent = pad(now.getMinutes());
+      if (els.ss) els.ss.textContent = pad(now.getSeconds());
+      if (blink) {
+        const dim = now.getSeconds() % 2 === 1;
+        els.seps.forEach((s) => s.classList.toggle("dim", dim));
+      }
+    },
+  };
+}
+
+// ---------------- Relógio analógico ----------------
+export function clockAnalog(opts = {}) {
+  const { seconds = true } = opts;
+  let hHand, mHand, sHand;
+  return {
+    mount(el) {
+      const ticks = Array.from({ length: 12 }, (_, i) => {
+        const major = i % 3 === 0;
+        return `<line x1="100" y1="${major ? 14 : 16}" x2="100" y2="${major ? 30 : 24}" stroke-width="${major ? 4 : 2.5}" transform="rotate(${i * 30} 100 100)"/>`;
+      }).join("");
+      el.innerHTML = `
+        <svg class="clock-analog" viewBox="0 0 200 200" role="img" aria-label="clock">
+          <circle class="face" cx="100" cy="100" r="94"/>
+          <g class="ticks">${ticks}</g>
+          <line class="hand hand-h" x1="100" y1="112" x2="100" y2="52"/>
+          <line class="hand hand-m" x1="100" y1="116" x2="100" y2="30"/>
+          ${seconds ? '<line class="hand hand-s" x1="100" y1="122" x2="100" y2="22"/>' : ""}
+          <circle class="hub" cx="100" cy="100" r="5"/>
+        </svg>`;
+      hHand = el.querySelector(".hand-h");
+      mHand = el.querySelector(".hand-m");
+      sHand = el.querySelector(".hand-s");
+    },
+    update(now) {
+      const s = now.getSeconds();
+      const m = now.getMinutes() + s / 60;
+      const h = (now.getHours() % 12) + m / 60;
+      hHand.setAttribute("transform", `rotate(${h * 30} 100 100)`);
+      mHand.setAttribute("transform", `rotate(${m * 6} 100 100)`);
+      if (sHand) sHand.setAttribute("transform", `rotate(${s * 6} 100 100)`);
+    },
+  };
+}
+
+// ---------------- Linha de informações (Minimalista) ----------------
+export function infoLine() {
+  const render = (now) => {
+    const s = store.get();
+    const parts = [];
+    if (s.showWeekday) parts.push(formatWeekday(now));
+    if (s.showDate) parts.push(formatDate(now, s.dateFormat, s.dateSeparator));
+    const temp = currentTempText();
+    if (temp) parts.push(temp);
+    return parts.map(esc).join('<span class="dot">·</span>');
+  };
+  const comp = textComponent(render, { className: "info-line" });
+  comp.isEmpty = () => { const s = store.get(); return !s.showWeekday && !s.showDate && !s.tempEnabled; };
+  return comp;
+}
+
+// ---------------- Componentes de texto ----------------
+export const weekday = () => textComponent((now) => esc(formatWeekday(now, "long")));
+
+export const date = () => textComponent((now) => {
+  const s = store.get();
+  return esc(formatDate(now, s.dateFormat, s.dateSeparator));
+});
+
+export const weekdayDate = () => textComponent((now) => {
+  const s = store.get();
+  return `${esc(formatWeekday(now))}<span class="dot">·</span>${esc(formatDate(now, s.dateFormat, s.dateSeparator))}`;
+});
+
+export const temperature = () => textComponent(() => esc(currentTempText()));
+
+export const freeText = (opts = {}, big = false) =>
+  textComponent((now) => esc(expand(opts.text || "", now)), { className: big ? "comp-text comp-text-big" : "comp-text" });
+
+// ---------------- Segundo fuso horário ----------------
+export const ZONES = [
+  "America/Sao_Paulo", "America/Manaus", "America/New_York", "America/Chicago", "America/Denver",
+  "America/Los_Angeles", "America/Mexico_City", "America/Buenos_Aires", "Europe/Lisbon", "Europe/London",
+  "Europe/Madrid", "Europe/Paris", "Europe/Berlin", "Africa/Johannesburg", "Asia/Dubai", "Asia/Kolkata",
+  "Asia/Singapore", "Asia/Shanghai", "Asia/Tokyo", "Australia/Sydney", "Pacific/Auckland", "UTC",
+];
+
+export const zoneCity = (zone) => (zone === "UTC" ? "UTC" : zone.split("/").pop().replace(/_/g, " "));
+
+export function timezone(opts = {}) {
+  const zone = opts.zone || "Europe/Lisbon";
+  const hour12 = !!store.get().custom.center.hour12;
+  let fmt;
+  try {
+    fmt = new Intl.DateTimeFormat("en-GB", { timeZone: zone, hour: "2-digit", minute: "2-digit", hour12 });
+  } catch {
+    fmt = null;
+  }
+  return textComponent((now) => {
+    if (!fmt) return "";
+    const label = opts.label?.trim() || zoneCity(zone);
+    return `${esc(label)} <span class="strong">${esc(fmt.format(now).toUpperCase())}</span>`;
+  });
+}
+
+// ---------------- Progresso (dia / semana / mês / ano) ----------------
+export function progress(opts = {}) {
+  const mode = opts.mode || "day";
+  let fill, label, last = -1;
+  const ratio = (now) => {
+    const y = now.getFullYear(), mo = now.getMonth(), d = now.getDate();
+    let start, end;
+    if (mode === "year") { start = new Date(y, 0, 1); end = new Date(y + 1, 0, 1); }
+    else if (mode === "month") { start = new Date(y, mo, 1); end = new Date(y, mo + 1, 1); }
+    else if (mode === "week") {
+      const dow = (now.getDay() + 6) % 7; // segunda = 0
+      start = new Date(y, mo, d - dow); end = new Date(y, mo, d - dow + 7);
+    } else { start = new Date(y, mo, d); end = new Date(y, mo, d + 1); }
+    return (now - start) / (end - start);
+  };
+  return {
+    mount(el) {
+      el.innerHTML = `<div class="comp-progress"><span class="p-label"></span><span class="p-bar"><span class="p-fill"></span></span></div>`;
+      fill = el.querySelector(".p-fill");
+      label = el.querySelector(".p-label");
+      last = -1;
+    },
+    update(now) {
+      const pct = Math.floor(ratio(now) * 100);
+      if (pct === last) return;
+      last = pct;
+      fill.style.width = pct + "%";
+      label.textContent = `${t("progress." + mode)} ${pct}%`;
+    },
+  };
+}
+
+// ---------------- Fase da lua ----------------
+const SYNODIC = 29.530588853;
+const KNOWN_NEW_MOON = Date.UTC(2000, 0, 6, 18, 14); // lua nova de referência
+
+export function moonPhase(now) {
+  const days = (now.getTime() - KNOWN_NEW_MOON) / 86400000;
+  return (((days % SYNODIC) + SYNODIC) % SYNODIC) / SYNODIC; // 0 = nova, 0.5 = cheia
+}
+
+function phaseName(p) {
+  const idx = Math.round(p * 8) % 8;
+  return t("moon." + ["new", "waxingCrescent", "firstQuarter", "waxingGibbous", "full", "waningGibbous", "lastQuarter", "waningCrescent"][idx]);
+}
+
+function southern(opts) {
+  if (opts.hemisphere === "north") return false;
+  if (opts.hemisphere === "south") return true;
+  const lat = store.getWeatherCache()?.lat;
+  if (typeof lat === "number") return lat < 0;
+  return getLanguage() === "pt-BR";
+}
+
+export function moon(opts = {}) {
+  let svgPath, svgG, label, lastKey = "";
+  return {
+    mount(el) {
+      el.innerHTML = `<div class="comp-moon">
+        <svg viewBox="-12 -12 24 24" class="moon-icon" aria-hidden="true">
+          <circle r="10" class="moon-dark"/><g><path class="moon-lit"/></g>
+        </svg><span class="moon-label"></span></div>`;
+      svgPath = el.querySelector(".moon-lit");
+      svgG = el.querySelector("g");
+      label = el.querySelector(".moon-label");
+      lastKey = "";
+    },
+    update(now) {
+      const p = moonPhase(now);
+      const key = p.toFixed(3) + (opts.showName === false ? "0" : "1");
+      if (key === lastKey) return;
+      lastKey = key;
+      const r = 10;
+      const f = (1 - Math.cos(2 * Math.PI * p)) / 2;          // fração iluminada
+      const rx = r * Math.abs(Math.cos(2 * Math.PI * p));
+      const sweep = f < 0.5 ? 0 : 1;
+      svgPath.setAttribute("d", `M0 ${-r} A${r} ${r} 0 0 1 0 ${r} A${rx} ${r} 0 0 ${sweep} 0 ${-r}Z`);
+      let rightLit = p < 0.5;              // crescente: lado direito (hemisfério norte)
+      if (southern(opts)) rightLit = !rightLit;
+      svgG.setAttribute("transform", rightLit ? "" : "scale(-1 1)");
+      label.textContent = opts.showName === false ? "" : phaseName(p);
+    },
+  };
+}
+
+// ---------------- Contagem até uma data ----------------
+export function countdown(opts = {}) {
+  return textComponent((now) => {
+    if (!opts.date) return "";
+    const [y, m, d] = opts.date.split("-").map(Number);
+    const target = new Date(y, m - 1, d);
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const diff = Math.round((target - today) / 86400000);
+    const name = opts.label?.trim() ? esc(opts.label.trim()) : "";
+    let txt;
+    if (diff === 0) txt = t("countdown.today");
+    else if (diff > 0) txt = t(diff === 1 ? "countdown.day" : "countdown.days", { n: diff });
+    else txt = t("countdown.ago", { n: -diff });
+    return name ? `${esc(txt)}<span class="dot">·</span>${name}` : esc(txt);
+  });
+}
+
+// ---------------- Catálogo ----------------
+/** Componentes disponíveis para os slots laterais (ordem = ordem no editor). */
+export const SLOT_TYPES = ["empty", "weekdayDate", "weekday", "date", "temperature", "timezone", "progress", "moon", "countdown", "text"];
+
+/** Tipos disponíveis para o centro. */
+export const CENTER_TYPES = ["digital", "analog", "text"];
+
+export function createSlotComponent(cfg = {}) {
+  switch (cfg.type) {
+    case "weekdayDate": return weekdayDate();
+    case "weekday": return weekday();
+    case "date": return date();
+    case "temperature": return temperature();
+    case "timezone": return timezone(cfg);
+    case "progress": return progress(cfg);
+    case "moon": return moon(cfg);
+    case "countdown": return countdown(cfg);
+    case "text": return freeText(cfg);
+    default: return null;
+  }
+}
+
+export function createCenterComponent(c = {}) {
+  if (c.type === "analog") return clockAnalog({ seconds: c.analogSeconds });
+  if (c.type === "text") return freeText({ text: c.text }, true);
+  return clockDigital(c);
+}

@@ -4,10 +4,16 @@
 
 Funciona como um app instalado na Tela de Início (PWA): tela cheia, tela sempre ligada, funciona offline.
 
-## Funcionalidades (v0.1.0)
+## Funcionalidades (v0.2.0)
 
-- Mostrador **Minimalista**: `HH:MM:SS` em 24h, fundo preto (ideal para OLED)
-- 5 cores: Terminal (verde), Âmbar, Neve, Gelo, Noturno
+- Mostrador **Minimalista**: `HH:MM:SS` em 24h, pronto para usar
+- Mostrador **Customizado**: grade 3×3 em que cada posição recebe um componente
+  - Centro: relógio digital (12/24h, segundos, dois-pontos piscando, 5 fontes), analógico ou texto livre
+  - Posições: dia + data, dia da semana, data, temperatura, outro fuso, progresso (dia/semana/mês/ano), fase da lua, contagem até uma data, texto livre
+  - Texto livre com placeholders: `{HH} {hh} {mm} {ss} {ampm} {weekday} {wd} {day} {month} {monthName} {mon} {year} {date} {temp}`
+  - Cores personalizadas: fundo, principal e uma cor para horas, minutos e segundos
+- 7 paletas: **Sistema** (padrão; segue o modo claro/escuro do aparelho), Terminal, Âmbar, Neve, Gelo, Noturno e Papel (clara)
+- **Restaurar padrão** nas configurações
 - Linha discreta com dia da semana, data e temperatura (opcionais)
 - **Tela sempre ligada** (Wake Lock)
 - **Brilho**: deslize para cima/baixo na tela
@@ -38,7 +44,7 @@ Abra o endereço no Chrome → menu ⋮ → **Instalar app** (ou *Adicionar à t
 
 ## Publicar uma nova versão
 
-Ao alterar arquivos, aumente `CACHE_VERSION` em `sw.js` (ex.: `nada-clock-v0.1.1`) e `VERSION` em `js/settings.js`. Assim os aparelhos baixam os arquivos novos.
+Ao alterar arquivos, aumente `CACHE_VERSION` em `sw.js` (ex.: `nada-clock-v0.2.1`) e `VERSION` em `js/settings.js`. Assim os aparelhos baixam os arquivos novos.
 
 ## Estrutura
 
@@ -48,7 +54,10 @@ manifest.webmanifest    dados para instalar como app
 sw.js                   service worker (offline)
 css/style.css           visual e paletas
 js/app.js               início, gestos, brilho, wake lock, burn-in, modo noturno
-js/faces.js             motor da grade 3x3 e componentes (relógio, linha de informações)
+js/faces.js             motor da grade 3x3 (Minimalista e Customizado)
+js/components.js        componentes (relógios, data, fuso, progresso, lua, contagem, texto)
+js/tokens.js            placeholders do texto livre
+js/themes.js            paletas e modo Sistema
 js/settings.js          painel de configurações
 js/weather.js           temperatura (Open-Meteo)
 js/store.js             preferências salvas no aparelho
@@ -68,7 +77,9 @@ python3 -m http.server 8000
 ## Roadmap
 
 - [x] Relógio Minimalista
-- [ ] Relógio Customizado (grade 3x3 com componentes e placeholders, 6ª paleta clara)
+- [x] Relógio Customizado (grade 3x3 com componentes e placeholders, paleta clara, Sistema)
+- [ ] Vários presets salvos no Customizado
+- [ ] Nascer/pôr do sol
 - [ ] Timer e Cronômetro
 - [ ] Pomodoro
 

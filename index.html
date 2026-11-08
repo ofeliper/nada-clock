@@ -61,6 +61,22 @@
     </section>
   </div>
 
+  <!-- Aviso caso o app não carregue (ex.: aberto direto do disco, via file://) -->
+  <div id="boot-error" class="boot-error" hidden>
+    <p lang="pt-BR"><strong>O NADA Clock não carregou.</strong><br>
+      Se você abriu o arquivo direto da pasta (endereço começando com <code>file://</code>), o navegador bloqueia os scripts.
+      Abra pelo endereço publicado (GitHub Pages) ou rode um servidor local:<br>
+      <code>python3 -m http.server 8000</code> → <code>http://localhost:8000</code></p>
+    <p lang="en"><strong>NADA Clock didn't load.</strong><br>
+      If you opened the file directly from disk (<code>file://</code>), the browser blocks its scripts.
+      Open the published URL or run a local server (see above).</p>
+  </div>
+  <script>
+    setTimeout(function () {
+      if (!window.__nadaReady) document.getElementById("boot-error").hidden = false;
+    }, 2000);
+  </script>
+
   <script type="module" src="js/app.js"></script>
 </body>
 </html>

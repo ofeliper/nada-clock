@@ -4,6 +4,7 @@ import * as weather from "./weather.js";
 import { resolveLanguage, setLanguage, translateStatic } from "./i18n.js";
 import { mountFace, updateFace, relayout } from "./faces.js";
 import * as settings from "./settings.js";
+import { THEMES, resolveTheme, onSystemChange } from "./themes.js";
 
 const $ = (id) => document.getElementById(id);
 const stage = $("stage");
@@ -35,13 +36,40 @@ function isNightTime(now, start, end) {
   return a < b ? cur >= a && cur < b : cur >= a || cur < b; // intervalo que cruza a meia-noite
 }
 
+const COLOR_VARS = { bg: "--bg", fg: "--fg", hours: "--c-hours", minutes: "--c-minutes", seconds: "--c-seconds" };
+const themeMeta = document.querySelector('meta[name="theme-color"]');
+
 function applyTheme(now = new Date()) {
   const s = store.get();
-  const theme = s.nightEnabled && isNightTime(now, s.nightStart, s.nightEnd) ? "night" : s.theme;
-  if (document.documentElement.dataset.theme !== theme) {
-    document.documentElement.dataset.theme = theme;
+  const night = s.nightEnabled && isNightTime(now, s.nightStart, s.nightEnd);
+  const theme = night ? "night" : resolveTheme(s.theme);
+  const html = document.documentElement;
+  if (html.dataset.theme !== theme) html.dataset.theme = theme;
+
+  // cores personalizadas do Customizado (o modo noturno tem prioridade)
+  const col = s.custom.colors;
+  const useCustom = s.face === "custom" && col.enabled && !night;
+  for (const [k, cssVar] of Object.entries(COLOR_VARS)) {
+    if (useCustom) rootStyle.setProperty(cssVar, col[k]);
+    else rootStyle.removeProperty(cssVar);
   }
+  if (useCustom) rootStyle.setProperty("--c-sep", col.fg);
+  else rootStyle.removeProperty("--c-sep");
+
+  const bg = useCustom ? col.bg : THEMES[theme].bg;
+  if (themeMeta) themeMeta.setAttribute("content", bg);
+  html.style.colorScheme = isLight(bg) ? "light" : "dark";
 }
+
+function isLight(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || "");
+  if (!m) return false;
+  const n = parseInt(m[1], 16);
+  const r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+  return (0.299 * r + 0.587 * g + 0.114 * b) > 150;
+}
+
+onSystemChange(() => applyTheme());
 
 // ---------------- Brilho ----------------
 function applyBrightness(v) {
@@ -188,20 +216,21 @@ function loop() {
 
 // ---------------- Reação a mudanças nas configurações ----------------
 store.subscribe((s, patch) => {
-  if ("language" in patch) applyLanguage();
-  if ("theme" in patch || "nightEnabled" in patch || "nightStart" in patch || "nightEnd" in patch) applyTheme();
+  if ("language" in patch) { applyLanguage(); mountFace(grid, true); }
+  if (["theme", "nightEnabled", "nightStart", "nightEnd", "face", "custom"].some((k) => k in patch)) applyTheme();
   if ("burnIn" in patch) applyBurnIn();
   if ("brightness" in patch) applyBrightness(s.brightness);
+  if ("face" in patch || "custom" in patch) mountFace(grid);
   relayout();
   tick();
 });
-weather.subscribe(() => tick());
+weather.subscribe(() => { relayout(); tick(); });
 
 // ---------------- Início ----------------
 applyLanguage();
 applyTheme();
 applyBrightness(store.get().brightness);
-mountFace(store.get().face, grid);
+mountFace(grid, true);
 settings.initSettings({ onClose: () => tick(), wakeLockState: () => wakeLockState });
 weather.init();
 applyBurnIn();
@@ -210,6 +239,7 @@ requestWakeLock();
 
 // mostra os controles por alguns segundos na primeira abertura
 showUI();
+window.__nadaReady = true;
 
 // Service worker: funciona offline e permite instalar na Tela de Início
 if ("serviceWorker" in navigator && location.protocol === "https:") {

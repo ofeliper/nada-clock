@@ -1,105 +1,52 @@
 // Motor de mostradores: uma grade 3x3 onde cada slot recebe um componente (ou fica vazio).
-// O "Minimalista" é só um preset fixo deste motor; o "Customizado" vai reutilizá-lo.
+// O "Minimalista" é um preset fixo; o "Customizado" é montado a partir das configurações.
 import * as store from "./store.js";
-import { formatDate, formatWeekday, getLanguage, LANGUAGES } from "./i18n.js";
-import { formatTemp } from "./weather.js";
+import { clockDigital, infoLine, createSlotComponent, createCenterComponent } from "./components.js";
 
 const SIDE_SIZE = "15%";
 const ROW_SLOTS = ["TL", "T", "TR", "BL", "B", "BR"];
 const COL_SLOTS = ["TL", "L", "BL", "TR", "R", "BR"];
 
-const pad = (n) => String(n).padStart(2, "0");
-
-// ---------------- Componentes ----------------
-
-/** Relógio digital HH:MM:SS. Opções pensando no Customizado: hour12, seconds. */
-function clockDigital(opts = {}) {
-  const { hour12 = false, seconds = true } = opts;
-  let els;
-  return {
-    mount(el) {
-      el.innerHTML = `<div class="clock-digital" role="timer">
-        <span class="hh"></span><span class="sep">:</span><span class="mm"></span>${seconds ? '<span class="sep">:</span><span class="ss"></span>' : ""}
-      </div>`;
-      els = {
-        hh: el.querySelector(".hh"),
-        mm: el.querySelector(".mm"),
-        ss: el.querySelector(".ss"),
-      };
-    },
-    update(now) {
-      let h = now.getHours();
-      if (hour12) h = h % 12 || 12;
-      els.hh.textContent = pad(h);
-      els.mm.textContent = pad(now.getMinutes());
-      if (els.ss) els.ss.textContent = pad(now.getSeconds());
-    },
-  };
-}
-
-/** Linha discreta: dia da semana · data · temperatura. */
-function infoLine() {
-  let el;
-  let last = "";
-  return {
-    mount(target) {
-      el = document.createElement("div");
-      el.className = "info-line";
-      target.replaceChildren(el);
-      last = "";
-    },
-    update(now) {
-      const s = store.get();
-      const parts = [];
-      if (s.showWeekday) parts.push(formatWeekday(now));
-      if (s.showDate) parts.push(formatDate(now, s.dateFormat, s.dateSeparator));
-      if (s.tempEnabled) {
-        const w = store.getWeatherCache();
-        if (w?.tempC != null) {
-          const unit = s.tempUnit || LANGUAGES[getLanguage()].defaults.tempUnit;
-          parts.push(formatTemp(w.tempC, unit));
-        }
-      }
-      const html = parts.map(escapeHTML).join('<span class="dot">·</span>');
-      if (html !== last) {
-        el.innerHTML = html;
-        last = html;
-      }
-    },
-    isEmpty() {
-      const s = store.get();
-      return !s.showWeekday && !s.showDate && !s.tempEnabled;
-    },
-  };
-}
-
-function escapeHTML(str) {
-  return String(str).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-}
-
-// ---------------- Presets ----------------
-
-export const FACES = {
+const FACES = {
   minimal: () => ({
-    C: clockDigital({ hour12: false, seconds: true }),
+    C: clockDigital({ hour12: false, seconds: true, font: "thin" }),
     B: infoLine(),
   }),
+  custom: () => {
+    const c = store.get().custom;
+    const out = { C: createCenterComponent(c.center) };
+    for (const [slot, cfg] of Object.entries(c.slots)) {
+      if (slot === "TR" || slot === "C") continue; // TR: botão de configurações
+      const comp = createSlotComponent(cfg);
+      if (comp) out[slot] = comp;
+    }
+    return out;
+  },
 };
-
-// ---------------- Motor ----------------
 
 let mounted = {};
 let gridEl;
+let currentKey = "";
 
-export function mountFace(name, grid) {
+/** Monta o mostrador. Só remonta se algo relevante mudou. */
+export function mountFace(grid, force = false) {
   gridEl = grid;
-  const factory = FACES[name] || FACES.minimal;
+  const s = store.get();
+  const key = s.face === "custom" ? "custom:" + JSON.stringify({ center: s.custom.center, slots: s.custom.slots }) : "minimal";
+  if (!force && key === currentKey) return;
+  currentKey = key;
+
+  const factory = FACES[s.face] || FACES.minimal;
   const components = factory();
   mounted = {};
   grid.querySelectorAll(".slot").forEach((slot) => {
     const id = slot.dataset.slot;
     const comp = components[id];
     slot.replaceChildren();
+    let type = "";
+    if (comp && s.face === "custom") type = id === "C" ? s.custom.center.type : (s.custom.slots[id]?.type || "");
+    else if (comp) type = id === "C" ? "digital" : "info";
+    slot.dataset.type = type;
     if (comp) {
       comp.mount(slot);
       mounted[id] = comp;

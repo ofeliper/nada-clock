@@ -2,16 +2,23 @@
 import * as store from "./store.js";
 import * as weather from "./weather.js";
 import { t, LANGUAGES, getLanguage, formatShortTime, formatDate } from "./i18n.js";
+import { THEMES, THEME_ORDER, resolveTheme } from "./themes.js";
+import { SLOT_TYPES, CENTER_TYPES, ZONES, zoneCity } from "./components.js";
+import { TOKENS, expand } from "./tokens.js";
 
-export const VERSION = "0.1.0";
+export const VERSION = "0.2.0";
 
-const THEMES = ["terminal", "amber", "snow", "ice", "night"];
-const THEME_COLORS = { terminal: "#33ff66", amber: "#ffb000", snow: "#e8e8e8", ice: "#5ac8fa", night: "#b3261e" };
 const DATE_FORMATS = ["auto", "dmy", "mdy", "ymd", "short", "long"];
 const SEPARATORS = ["/", "-", "."];
+const FONTS = ["thin", "regular", "bold", "mono", "rounded"];
+const GRID = ["TL", "T", "TR", "L", "C", "R", "BL", "B", "BR"];
 
 let root, body, onCloseCb, getWakeLockState;
 let asking = false;           // mostrando o aviso "precisamos da localização"
+let selectedSlot = "B";       // posição selecionada no editor do Customizado
+let resetArmed = false;       // 1º toque em "Restaurar padrão"
+let resetTimer;
+let suppressRender = false;   // evita redesenhar o painel enquanto a pessoa digita
 
 export function initSettings({ onClose, wakeLockState }) {
   root = document.getElementById("settings");
@@ -27,9 +34,12 @@ export function initSettings({ onClose, wakeLockState }) {
   });
 
   body.addEventListener("change", onChange);
+  body.addEventListener("input", onInput);
   body.addEventListener("click", onClick);
+  // os botões de placeholder não tiram o foco do campo de texto (mantém o cursor)
+  body.addEventListener("mousedown", (e) => { if (e.target.closest(".chip")) e.preventDefault(); });
 
-  store.subscribe(() => { if (isOpen()) render(); });
+  store.subscribe(() => { if (isOpen() && !suppressRender) render(); });
   weather.subscribe(() => { if (isOpen()) render(); });
 }
 
@@ -39,6 +49,7 @@ export function isOpen() {
 
 export function open() {
   asking = false;
+  resetArmed = false;
   root.hidden = false;
   render();
 }
@@ -59,28 +70,26 @@ function render() {
   const s = store.get();
   const scroll = body.scrollTop;
   const lang = getLanguage();
-  const sample = new Date(2026, 10, 8);
+  const custom = s.face === "custom";
 
   body.innerHTML = `
     ${group(t("group.display"), `
-      <div class="swatches" role="group" aria-label="${t("theme.label")}">
-        ${THEMES.map((th) => `
-          <button type="button" class="swatch" data-action="theme" data-value="${th}" aria-pressed="${s.theme === th}">
-            <span class="swatch-chip" style="color:${THEME_COLORS[th]}">12:34</span>
-            ${t("theme." + th)}
-          </button>`).join("")}
+      <div class="segmented" role="group" aria-label="${t("face.label")}">
+        <button type="button" data-action="face" data-value="minimal" aria-pressed="${!custom}">${t("face.minimal")}</button>
+        <button type="button" data-action="face" data-value="custom" aria-pressed="${custom}">${t("face.custom")}</button>
       </div>
+      <div class="swatches" role="group" aria-label="${t("theme.label")}">
+        ${THEME_ORDER.map((th) => swatch(th, s.theme === th)).join("")}
+      </div>
+      ${s.theme === "system" ? `<div class="row"><span class="row-label"><span class="row-hint">${t("theme.systemHint")}</span></span></div>` : ""}
     `)}
 
+    ${custom ? centerSection(s) + slotsSection(s) + colorsSection(s) : ""}
+
     ${group(t("group.info"), `
-      ${switchRow("showWeekday", t("info.weekday"), s.showWeekday)}
-      ${switchRow("showDate", t("info.date"), s.showDate)}
-      ${s.showDate ? selectRow("dateFormat", t("info.dateFormat"), DATE_FORMATS.map((f) => ({
-        value: f,
-        label: f === "auto" ? `${t("dateFormat.auto")} — ${formatDate(sample, "auto", s.dateSeparator)}` : `${t("dateFormat." + f)}${["short", "long"].includes(f) ? " — " + formatDate(sample, f) : ""}`,
-      })), s.dateFormat) : ""}
-      ${s.showDate && usesSeparator(s.dateFormat, lang) ? selectRow("dateSeparator", t("info.separator"),
-        SEPARATORS.map((x) => ({ value: x, label: x })), s.dateSeparator) : ""}
+      ${!custom ? switchRow("showWeekday", t("info.weekday"), s.showWeekday) : ""}
+      ${!custom ? switchRow("showDate", t("info.date"), s.showDate) : ""}
+      ${custom || s.showDate ? dateFormatRows(s, lang) : ""}
     `)}
 
     ${group(t("group.temperature"), temperatureSection(s, lang))}
@@ -104,6 +113,12 @@ function render() {
           <span class="row-hint ${getWakeLockState() === "on" ? "" : "warn"}">${wakeLockText()}</span>
         </span>
       </div>
+      <div class="row">
+        <span class="row-label">
+          <button type="button" class="btn danger ${resetArmed ? "confirm" : ""}" data-action="reset">${resetArmed ? t("general.resetConfirm") : t("general.reset")}</button>
+          <span class="row-hint">${t("general.resetHint")}</span>
+        </span>
+      </div>
     `)}
 
     <div class="about">
@@ -115,6 +130,124 @@ function render() {
   body.scrollTop = scroll;
 }
 
+function swatch(th, pressed) {
+  const isSystem = th === "system";
+  const style = isSystem ? "" : `style="color:${THEMES[th].fg};background:${THEMES[th].bg}"`;
+  return `
+    <button type="button" class="swatch" data-action="theme" data-value="${th}" aria-pressed="${pressed}">
+      <span class="swatch-chip ${isSystem ? "chip-system" : ""}" ${style}>12:34</span>
+      ${t("theme." + th)}
+    </button>`;
+}
+
+function dateFormatRows(s, lang) {
+  const sample = new Date(2026, 10, 8);
+  return `
+    ${selectRow("dateFormat", t("info.dateFormat"), DATE_FORMATS.map((f) => ({
+      value: f,
+      label: f === "auto"
+        ? `${t("dateFormat.auto")} — ${formatDate(sample, "auto", s.dateSeparator)}`
+        : `${t("dateFormat." + f)}${["short", "long"].includes(f) ? " — " + formatDate(sample, f) : ""}`,
+    })), s.dateFormat)}
+    ${["auto", "dmy", "mdy"].includes(s.dateFormat) ? selectRow("dateSeparator", t("info.separator"),
+      SEPARATORS.map((x) => ({ value: x, label: x })), s.dateSeparator) : ""}`;
+}
+
+// ---------- Customizado: centro ----------
+function centerSection(s) {
+  const c = s.custom.center;
+  let rows = selectRow(null, t("center.type"), CENTER_TYPES.map((x) => ({ value: x, label: t("center." + x) })), c.type, 'data-center="type"');
+  if (c.type === "digital") {
+    rows += switchRow(null, t("center.hour12"), c.hour12, "", 'data-center="hour12"');
+    rows += switchRow(null, t("center.seconds"), c.seconds, "", 'data-center="seconds"');
+    rows += switchRow(null, t("center.blink"), c.blink, "", 'data-center="blink"');
+    rows += selectRow(null, t("center.font"), FONTS.map((f) => ({ value: f, label: t("font." + f) })), c.font, 'data-center="font"');
+  } else if (c.type === "analog") {
+    rows += switchRow(null, t("center.analogSeconds"), c.analogSeconds, "", 'data-center="analogSeconds"');
+  } else if (c.type === "text") {
+    rows += textEditor("center-text", c.text, 'data-center="text"');
+  }
+  return group(t("group.center"), rows);
+}
+
+// ---------- Customizado: posições ----------
+function slotLabel(id, s) {
+  if (id === "TR") return "⚙️";
+  if (id === "C") return t("comp." + (s.custom.center.type === "text" ? "text" : s.custom.center.type));
+  const type = s.custom.slots[id]?.type || "empty";
+  return type === "empty" ? "—" : t("comp." + type);
+}
+
+function slotsSection(s) {
+  if (selectedSlot === "C" || selectedSlot === "TR") selectedSlot = "B";
+  const grid = `
+    <div class="slot-grid" role="group" aria-label="${t("group.slots")}">
+      ${GRID.map((id) => {
+        const filled = id === "C" || (s.custom.slots[id] && s.custom.slots[id].type !== "empty");
+        const disabled = id === "TR" || id === "C";
+        return `<button type="button" data-action="slot" data-value="${id}" ${disabled ? "disabled" : ""}
+          class="${filled ? "filled" : ""}" aria-pressed="${id === selectedSlot}">${slotLabel(id, s)}</button>`;
+      }).join("")}
+    </div>`;
+
+  const cfg = s.custom.slots[selectedSlot] || { type: "empty" };
+  let rows = selectRow(null, t("slots.component"), SLOT_TYPES.map((x) => ({ value: x, label: t("comp." + x) })), cfg.type, "data-slottype");
+
+  switch (cfg.type) {
+    case "timezone":
+      rows += selectRow(null, t("tz.zone"), ZONES.map((z) => ({ value: z, label: zoneCity(z) })), cfg.zone, 'data-slotfield="zone"');
+      rows += inputRow(t("tz.label"), cfg.label || "", t("tz.labelPlaceholder"), 'data-slotfield="label"');
+      break;
+    case "progress":
+      rows += selectRow(null, t("progress.mode"), ["day", "week", "month", "year"].map((m) => ({ value: m, label: t("progress." + m) })), cfg.mode, 'data-slotfield="mode"');
+      break;
+    case "moon":
+      rows += selectRow(null, t("moon.hemisphere"), ["auto", "north", "south"].map((h) => ({ value: h, label: t("moon." + h) })), cfg.hemisphere || "auto", 'data-slotfield="hemisphere"');
+      rows += switchRow(null, t("moon.showName"), cfg.showName !== false, "", 'data-slotfield="showName"');
+      break;
+    case "countdown":
+      rows += `<div class="row"><span class="row-label">${t("countdown.date")}</span><input type="date" data-slotfield="date" value="${esc(cfg.date || "")}"></div>`;
+      rows += inputRow(t("countdown.label"), cfg.label || "", t("countdown.labelPlaceholder"), 'data-slotfield="label"');
+      break;
+    case "text":
+      rows += textEditor("slot-text", cfg.text || "", 'data-slotfield="text"');
+      break;
+    case "temperature":
+      if (!s.tempEnabled) rows += `<div class="row"><span class="row-label"><span class="row-hint warn">${t("comp.tempOff")}</span></span></div>`;
+      break;
+  }
+
+  return group(t("group.slots"), `
+    <div class="row"><span class="row-label"><span class="row-hint">${t("slots.hint")}</span></span></div>
+    ${grid}
+    ${rows}`);
+}
+
+function textEditor(id, value, attr) {
+  return `
+    <div class="row row-stack">
+      <span class="row-label">${t("text.template")}</span>
+      <input type="text" class="field-input" id="${id}" ${attr} value="${esc(value)}" placeholder="${esc(t("text.placeholder"))}" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <span class="row-hint">${t("text.tokens")}</span>
+      <div class="chips">${TOKENS.map((tk) => `<button type="button" class="chip" data-action="token" data-target="${id}" data-value="{${tk}}">{${tk}}</button>`).join("")}</div>
+      <span class="preview" data-preview="${id}">${t("text.preview")} <b>${esc(expand(value))}</b></span>
+    </div>`;
+}
+
+// ---------- Customizado: cores ----------
+function colorsSection(s) {
+  const col = s.custom.colors;
+  let rows = switchRow(null, t("colors.enabled"), col.enabled, t("colors.hint"), 'data-color="enabled"');
+  if (col.enabled) {
+    for (const k of ["bg", "fg", "hours", "minutes", "seconds"]) {
+      rows += `<div class="row"><span class="row-label">${t("colors." + k)}</span><input type="color" data-color="${k}" value="${esc(col[k])}"></div>`;
+    }
+    rows += `<div class="row"><span class="row-label"></span><button type="button" class="btn" data-action="match-main">${t("colors.matchMain")}</button></div>`;
+  }
+  return group(t("group.colors"), rows);
+}
+
+// ---------- Temperatura ----------
 function temperatureSection(s, lang) {
   const status = weather.getStatus();
 
@@ -159,12 +292,6 @@ function temperatureSection(s, lang) {
   `;
 }
 
-function usesSeparator(format, lang) {
-  if (format === "dmy" || format === "mdy") return true;
-  if (format === "auto") return true; // auto vira dmy/mdy conforme o idioma
-  return false;
-}
-
 function wakeLockText() {
   const st = getWakeLockState();
   if (st === "on") return t("general.wakeLockOn");
@@ -174,36 +301,101 @@ function wakeLockText() {
 
 // ---------------- Helpers de HTML ----------------
 
+function esc(str) {
+  return String(str ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
 function group(title, inner) {
   return `<div class="group"><h3 class="group-title">${title}</h3><div class="card">${inner}</div></div>`;
 }
 
-function switchRow(key, label, checked, hint) {
+function switchRow(key, label, checked, hint, attr = "") {
   return `
     <label class="row">
       <span class="row-label">${label}${hint ? `<span class="row-hint">${hint}</span>` : ""}</span>
-      <span class="switch"><input type="checkbox" data-key="${key}" ${checked ? "checked" : ""}><span></span></span>
+      <span class="switch"><input type="checkbox" ${key ? `data-key="${key}"` : ""} ${attr} ${checked ? "checked" : ""}><span></span></span>
     </label>`;
 }
 
-function selectRow(key, label, options, value) {
+function selectRow(key, label, options, value, attr = "") {
   return `
     <label class="row">
       <span class="row-label">${label}</span>
-      <select data-key="${key}">
-        ${options.map((o) => `<option value="${o.value}" ${String(o.value) === String(value) ? "selected" : ""}>${o.label}</option>`).join("")}
+      <select ${key ? `data-key="${key}"` : ""} ${attr}>
+        ${options.map((o) => `<option value="${esc(o.value)}" ${String(o.value) === String(value) ? "selected" : ""}>${esc(o.label)}</option>`).join("")}
       </select>
+    </label>`;
+}
+
+function inputRow(label, value, placeholder, attr) {
+  return `
+    <label class="row">
+      <span class="row-label">${label}</span>
+      <input type="text" class="field-input" ${attr} value="${esc(value)}" placeholder="${esc(placeholder)}" autocomplete="off">
     </label>`;
 }
 
 // ---------------- Eventos ----------------
 
+const SLOT_DEFAULTS = {
+  timezone: () => ({ zone: "Europe/Lisbon", label: "" }),
+  progress: () => ({ mode: "day" }),
+  moon: () => ({ hemisphere: "auto", showName: true }),
+  countdown: () => {
+    const d = new Date(); d.setDate(d.getDate() + 30);
+    const pad = (n) => String(n).padStart(2, "0");
+    return { date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, label: "" };
+  },
+  text: () => ({ text: "{weekday}" }),
+};
+
+function readValue(el) {
+  return el.type === "checkbox" ? el.checked : el.value;
+}
+
+/** Aplica um campo editado. live = true enquanto a pessoa ainda está digitando/arrastando. */
+function applyField(el, live) {
+  const value = readValue(el);
+  const d = el.dataset;
+  const isText = el.type === "text" || el.type === "color";
+  if (live && !isText) return;          // selects/switches: só no "change"
+  suppressRender = live;
+  try {
+    if ("center" in d) store.setCustom("center", { [d.center]: value });
+    else if ("color" in d) {
+      if (d.color === "enabled" && value) {
+        // ao ligar, começa com as cores da paleta atual
+        const th = THEMES[resolveTheme(store.get().theme)];
+        store.setCustom("colors", { enabled: true, bg: th.bg, fg: th.fg, hours: th.fg, minutes: th.fg, seconds: th.fg });
+      } else {
+        store.setCustom("colors", { [d.color]: value });
+      }
+    } else if ("slotfield" in d) {
+      const cfg = store.get().custom.slots[selectedSlot] || { type: "empty" };
+      store.setSlot(selectedSlot, { ...cfg, [d.slotfield]: value });
+    } else if ("slottype" in d) {
+      store.setSlot(selectedSlot, { type: value, ...(SLOT_DEFAULTS[value]?.() || {}) });
+    } else if (d.key) {
+      store.set({ [d.key]: value });
+    }
+  } finally {
+    suppressRender = false;
+  }
+  // atualiza a prévia do texto sem redesenhar o painel
+  if (el.id) {
+    const prev = body.querySelector(`[data-preview="${el.id}"] b`);
+    if (prev) prev.textContent = expand(el.value);
+  }
+}
+
+function onInput(e) {
+  applyField(e.target, true);
+}
+
 async function onChange(e) {
   const el = e.target;
-  const key = el.dataset.key;
-  if (!key) return;
 
-  if (key === "tempEnabled") {
+  if (el.dataset.key === "tempEnabled") {
     if (el.checked) {
       // Se a permissão já foi dada antes, não precisa do aviso.
       if (await permissionGranted()) { weather.enable(); }
@@ -215,8 +407,9 @@ async function onChange(e) {
     return;
   }
 
-  const value = el.type === "checkbox" ? el.checked : el.value;
-  store.set({ [key]: value });
+  // textos e cores já foram aplicados enquanto a pessoa digitava/escolhia
+  if (el.type === "text" || el.type === "color") return;
+  applyField(el, false);
 }
 
 function onClick(e) {
@@ -225,9 +418,43 @@ function onClick(e) {
   const { action, value } = btn.dataset;
 
   if (action === "theme") store.set({ theme: value });
+  if (action === "face") store.set({ face: value });
+  if (action === "slot") { selectedSlot = value; render(); }
   if (action === "temp-allow") { asking = false; weather.enable(); render(); }
   if (action === "temp-cancel") { asking = false; render(); }
   if (action === "temp-refresh") weather.refreshNow();
+
+  if (action === "token") {
+    const input = document.getElementById(btn.dataset.target);
+    if (!input) return;
+    const start = input.selectionStart ?? input.value.length;
+    const end = input.selectionEnd ?? input.value.length;
+    input.value = input.value.slice(0, start) + value + input.value.slice(end);
+    const pos = start + value.length;
+    input.focus();
+    try { input.setSelectionRange(pos, pos); } catch { /* ok */ }
+    applyField(input, true);
+  }
+
+  if (action === "match-main") {
+    const fg = store.get().custom.colors.fg;
+    store.setCustom("colors", { hours: fg, minutes: fg, seconds: fg });
+  }
+
+  if (action === "reset") {
+    if (!resetArmed) {
+      resetArmed = true;
+      render();
+      clearTimeout(resetTimer);
+      resetTimer = setTimeout(() => { resetArmed = false; refresh(); }, 4000);
+    } else {
+      resetArmed = false;
+      clearTimeout(resetTimer);
+      selectedSlot = "B";
+      weather.disable();
+      store.reset();
+    }
+  }
 }
 
 async function permissionGranted() {
