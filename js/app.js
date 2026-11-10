@@ -348,6 +348,45 @@ function toAppDelta(dxScreen, dyScreen) {
 // ---------------- Gestos: toque e swipe vertical ----------------
 let gesture = null;
 
+/** Ponto da tela física → coordenadas do app (que pode estar girado). */
+function toAppPoint(x, y) {
+  if (rotation === "cw") return { x: y, y: innerWidth - x };
+  if (rotation === "ccw") return { x: innerHeight - y, y: x };
+  return { x, y };
+}
+
+// Segurar um elemento do Interativo: depois de um instante aparece um anel que vai
+// enchendo; ao completar, abre a edição com o elemento já selecionado.
+const HOLD_EDIT_DELAY = 280, HOLD_EDIT_MS = 900;
+const holdEdit = $("hold-edit");
+rootStyle.setProperty("--hold-edit-ms", HOLD_EDIT_MS + "ms");
+
+function startHoldEdit(g, el, e) {
+  const p = toAppPoint(e.clientX, e.clientY);
+  // um pouco acima do dedo, para não ficar escondido
+  const top = p.y - 64 < 40 ? p.y + 64 : p.y - 64;
+  g.holdTimers = [
+    setTimeout(() => {
+      holdEdit.style.left = p.x + "px";
+      holdEdit.style.top = top + "px";
+      holdEdit.classList.add("visible");
+      requestAnimationFrame(() => holdEdit.classList.add("filling"));
+    }, HOLD_EDIT_DELAY),
+    setTimeout(() => {
+      g.holdDone = true;
+      cancelHoldEdit(g);
+      try { navigator.vibrate?.(12); } catch { /* ok */ }
+      startEditing(el.dataset.id);
+    }, HOLD_EDIT_DELAY + HOLD_EDIT_MS),
+  ];
+}
+
+function cancelHoldEdit(g) {
+  if (g?.holdTimers) g.holdTimers.forEach(clearTimeout);
+  if (g) g.holdTimers = null;
+  holdEdit.classList.remove("visible", "filling");
+}
+
 stage.addEventListener("pointerdown", (e) => {
   if (free.isEditing()) return;                  // o editor cuida dos toques
   if (e.target.closest("button, input, select, a, label, .sw-laps, .tm-list")) return; // botões e lista de voltas
@@ -359,6 +398,8 @@ stage.addEventListener("pointerdown", (e) => {
     t0: performance.now(),
     moved: false,
   };
+  const iel = store.get().face === "interactive" && store.get().tab === "clock" && e.target.closest(".iel");
+  if (iel) startHoldEdit(gesture, iel, e);
   try { stage.setPointerCapture(e.pointerId); } catch { /* ok */ }
 });
 
@@ -367,6 +408,8 @@ stage.addEventListener("pointermove", (e) => {
   const { dx, dy } = toAppDelta(e.clientX - gesture.startX, e.clientY - gesture.startY); // dy > 0 = para cima
   gesture.dx = dx;
   gesture.dy = dy;
+  if (gesture.holdTimers && Math.hypot(dx, dy) > 10) cancelHoldEdit(gesture);
+  if (gesture.holdDone) return;
   if (gesture.horizontal) return;
   if (!gesture.moved && Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy)) { gesture.horizontal = true; return; } // troca de aba
   if (!gesture.moved && Math.abs(dy) < 10) return;
@@ -382,6 +425,8 @@ function endGesture(e) {
   if (!gesture || e.pointerId !== gesture.id) return;
   const g = gesture;
   gesture = null;
+  cancelHoldEdit(g);
+  if (g.holdDone) return;             // virou edição: não mostra/esconde a barra
   if (g.moved) {
     if (g.value != null) store.set({ brightness: g.value });
   } else if (g.horizontal) {
@@ -431,14 +476,14 @@ function applyClockType() {
   document.documentElement.dataset.clock = type;
 }
 
-function startEditing() {
+function startEditing(selectId = null) {
   if (locked) return;
   if (store.get().face !== "interactive") store.set({ face: "interactive" });
   if (store.get().tab !== "clock") store.set({ tab: "clock" });
   hideUI();
   rootStyle.setProperty("--shift-x", "0px");
   rootStyle.setProperty("--shift-y", "0px");
-  requestAnimationFrame(() => { free.startEditing(); applyMirror(); });
+  requestAnimationFrame(() => { free.startEditing(typeof selectId === "string" ? selectId : null); applyMirror(); });
 }
 
 // ---------------- Laço do relógio ----------------

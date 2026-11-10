@@ -676,7 +676,7 @@ body.ui-visible .brightness-indicator { top: calc(max(var(--sa-top), 14px) + var
 
 .sw-laps {
   list-style: none; margin: 0; padding: 0; width: min(80cqw, 460px); max-height: 28cqh; overflow-y: auto;
-  font-size: clamp(12px, 3.6cqh, 16px); font-variant-numeric: tabular-nums; touch-action: pan-y;
+  font-size: clamp(12px, 3.6cqh, 16px); font-variant-numeric: tabular-nums; touch-action: pan-x pan-y;
 }
 .sw-laps:empty { display: none; }
 .sw-laps li { display: flex; justify-content: space-between; gap: 12px; padding: 4px 2px; border-bottom: 1px solid color-mix(in srgb, var(--fg) 12%, transparent); }
@@ -692,7 +692,7 @@ body.ui-visible .brightness-indicator { top: calc(max(var(--sa-top), 14px) + var
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35); animation: sheet-in 0.18s ease-out;
 }
 .picker-title { padding: 12px 16px 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ui-text-2); }
-.picker-list { overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+.picker-list { overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; }
 .picker-opt {
   display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; padding: 13px 16px;
   border: 0; border-top: 1px solid var(--ui-line); background: transparent; color: var(--ui-text);
@@ -866,6 +866,20 @@ html.mirror .shift { transform: translate(var(--shift-x), var(--shift-y)) scaleX
   opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 19; white-space: nowrap;
 }
 .lock-hint.visible { opacity: 1; }
+/* segurar um elemento do Interativo para editar */
+.hold-edit {
+  position: fixed; z-index: 24; width: 64px; height: 64px; margin: -32px 0 0 -32px; pointer-events: none;
+  display: grid; place-items: center; border-radius: 50%; color: #fff;
+  background: rgba(20, 20, 22, 0.85); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  opacity: 0; transform: scale(0.6); transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.hold-edit.visible { opacity: 1; transform: scale(1); }
+.hold-edit > svg { grid-area: 1 / 1; }
+.hold-ring { width: 64px; height: 64px; transform: rotate(-90deg); }
+.hold-ring circle { fill: none; stroke-width: 4; }
+.hold-ring .bg { stroke: rgba(255,255,255,0.22); }
+.hold-ring .fg { stroke: #0a84ff; stroke-linecap: round; stroke-dasharray: 176; stroke-dashoffset: 176; }
+.hold-edit.filling .hold-ring .fg { transition: stroke-dashoffset var(--hold-edit-ms, 900ms) linear; stroke-dashoffset: 0; }
 .lock-ring { width: 22px; height: 22px; transform: rotate(-90deg); flex: none; }
 .lock-ring circle { fill: none; stroke-width: 3; }
 .lock-ring .bg { stroke: rgba(255,255,255,0.2); }
@@ -883,7 +897,7 @@ html.mirror .shift { transform: translate(var(--shift-x), var(--shift-y)) scaleX
 .tv-label { font-size: clamp(13px, 4.5cqh, 20px); letter-spacing: 0.06em; opacity: 0.75; min-height: 1.2em; margin-bottom: 0.6cqh; }
 .tm-list {
   list-style: none; margin: 0; padding: 0; width: min(86cqw, 460px); max-height: 30cqh; overflow-y: auto;
-  touch-action: pan-y; font-variant-numeric: tabular-nums;
+  touch-action: pan-x pan-y; font-variant-numeric: tabular-nums;
 }
 .tm-list:empty { display: none; }
 .tm-list li {
@@ -1005,7 +1019,7 @@ html.edit-bottom .edit-drawer {
 }
 .tb-btn.primary { background: #0a84ff; color: #fff; }
 .tb-btn.danger { background: #ff453a; color: #fff; }
-.edit-panel { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; margin: 0 -10px; }
+.edit-panel { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-x pan-y; margin: 0 -10px; }
 .ep-empty { padding: 12px 14px; color: var(--ui-text-2); font-size: 14px; }
 .ep-head {
   position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 8px;

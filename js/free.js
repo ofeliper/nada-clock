@@ -195,7 +195,7 @@ export function toggleClockType() {
 // ---------------- Edição ----------------
 
 /** Entra no modo de edição. A tela passa a ocupar a área toda (conversão sem mudar o que se vê). */
-export function startEditing() {
+export function startEditing(selectId = null) {
   if (editing || !root) return;
   const fw = root.clientWidth, fh = root.clientHeight;
   editOrient = orient();
@@ -221,6 +221,7 @@ export function startEditing() {
   renderPanel();
   renderToolbar();
   mount(true);
+  if (selectId && findEl(selectId)) select(selectId);
 }
 
 function finish(save) {

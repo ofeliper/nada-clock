@@ -4,7 +4,7 @@
 
 Funciona como um app instalado na Tela de Início (PWA): tela cheia, tela sempre ligada, funciona offline.
 
-## Funcionalidades (v0.7.2)
+## Funcionalidades (v0.7.3)
 
 - Quatro abas: **Relógio**, **Timer**, **Cronômetro** e **Pomodoro** — troque pela barra do topo (aparece com um toque) ou deslizando para o lado
 - **Timer**: vários ao mesmo tempo, com nome (ex.: "macarrão", "forno")
@@ -23,7 +23,7 @@ Funciona como um app instalado na Tela de Início (PWA): tela cheia, tela sempre
   - Cores personalizadas: fundo, principal e uma cor para horas, minutos e segundos
 - Mostrador **Interativo (beta)**, o padrão: monte a tela à mão, direto no relógio
   - Na edição, a tela aparece reduzida e as opções ficam numa gaveta ao lado (deitado) ou embaixo (em pé), sem cobrir nada
-  - Toque no lápis da barra (ou em Configurações → Editar a tela)
+  - Toque no lápis da barra (ou em Configurações → Editar a tela), ou **segure um elemento**: um anel enche e a edição abre com ele já selecionado
   - **＋ Adicionar** qualquer componente (inclusive mais de um relógio) e arraste para onde quiser
   - "Ímã": o elemento gruda no centro, nas margens e no alinhamento dos outros, com linhas-guia
   - Cada elemento tem tamanho (barra, −/+ ou pinça com dois dedos), cor, opacidade, alinhamento e fonte próprios, além das opções do tipo (fuso, texto, relógio digital/analógico…)
