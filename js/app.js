@@ -472,6 +472,15 @@ function endGesture(e) {
 }
 stage.addEventListener("pointerup", endGesture);
 stage.addEventListener("pointercancel", endGesture);
+// reserva: se o "soltar" não chegar ao palco (iOS, com o menu circular aparecendo sob o dedo)
+window.addEventListener("pointerup", (e) => { if (gesture && e.pointerId === gesture.id) endGesture(e); });
+window.addEventListener("pointercancel", (e) => { if (gesture && e.pointerId === gesture.id) endGesture(e); });
+window.addEventListener("touchend", (e) => {
+  if (gesture?.holdDone && e.touches.length === 0) {
+    const tch = e.changedTouches[0];
+    endGesture({ pointerId: gesture.id, type: "pointerup", clientX: tch?.clientX ?? gesture.lastX, clientY: tch?.clientY ?? gesture.lastY });
+  }
+});
 
 // libera o áudio no primeiro toque (exigência dos navegadores)
 document.addEventListener("pointerdown", () => sound.unlock(), { capture: true });

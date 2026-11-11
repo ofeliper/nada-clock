@@ -58,6 +58,8 @@ export function init(h) {
   root.addEventListener("pointermove", onMove);
   root.addEventListener("pointerup", onUp);
   root.addEventListener("pointercancel", () => { if (menu) menu.press = null; });
+  // reserva: alguns navegadores (iOS) às vezes não entregam o pointerup; o click sempre chega
+  root.addEventListener("click", onClick);
   document.addEventListener("keydown", (e) => {
     if (!menu) return;
     if (e.key === "Escape") { e.preventDefault(); menu.level === "main" ? close() : show("main"); }
@@ -266,6 +268,7 @@ export function dragMove(clientX, clientY) {
 export function dragEnd(clientX, clientY, cancelled = false) {
   if (!menu || menu.mode !== "drag") return;
   menu.mode = "tap";
+  menu.handledAt = performance.now();   // ignora o click que o navegador gera ao soltar
   if (cancelled) { menu.hi = -1; render(); return; }
   const hi = dragSlice(clientX, clientY);
   if (hi >= 0) activate(hi);
@@ -273,20 +276,22 @@ export function dragEnd(clientX, clientY, cancelled = false) {
 }
 
 function onDown(e) {
-  if (!menu || menu.mode !== "tap") return;
+  if (!menu) return;
+  // o "soltar" do dedo que abriu o menu se perdeu (acontece no iOS): passa para o modo calmo
+  if (menu.mode === "drag") { menu.mode = "tap"; menu.hi = -1; render(); }
   e.preventDefault();
   e.stopPropagation();
   try { root.setPointerCapture(e.pointerId); } catch { /* ok */ }
   const { dist, ang } = locate(e.clientX, e.clientY);
   if (menu.level === "bright") {
     if (dist < R1) { menu.press = { center: true }; return; }
-    if (dist > R2 + 30) { menu.press = { outside: true }; return; }
+    if (dist > R2) { menu.press = { outside: true }; return; }
     menu.press = { dial: true };
     setDial(ang);
     return;
   }
   if (dist < R1) menu.press = { center: true };
-  else if (dist > R2 + 24) menu.press = { outside: true };
+  else if (dist > R2) menu.press = { outside: true };
   else { menu.press = { slice: sliceAt(ang) }; menu.hi = menu.press.slice; render(); }
 }
 
@@ -304,15 +309,30 @@ function onUp(e) {
   if (!menu?.press) return;
   const press = menu.press;
   menu.press = null;
+  menu.handledAt = performance.now();
   const { dist, ang } = locate(e.clientX, e.clientY);
   if (press.dial) { hooks.brightness(menu.dial, true); return; }
-  if (press.center) {
-    if (dist < R1) menu.level === "main" ? close() : menu.level === "bright" ? show("main") : close();
-    return;
-  }
-  if (press.outside) { if (dist > R2 + 24) close(); return; }
-  if (press.slice != null && dist > R1 && dist < R2 + 24) activate(sliceAt(ang));
+  if (press.center) { centerTap(); return; }
+  if (press.outside) { close(); return; }
+  if (press.slice != null && dist > R1 && dist <= R2 + 24) activate(sliceAt(ang));
   else { menu.hi = -1; render(); }
+}
+
+function centerTap() {
+  if (menu.level === "bright") show("main");
+  else close();
+}
+
+/** Reserva para quando o pointerdown/pointerup não chegou: trata o toque pelo click. */
+function onClick(e) {
+  if (!menu) return;
+  if (menu.handledAt && performance.now() - menu.handledAt < 600) return;  // já tratado
+  menu.mode = "tap";
+  menu.press = null;
+  const { dist, ang } = locate(e.clientX, e.clientY);
+  if (dist < R1) centerTap();
+  else if (dist > R2) close();
+  else if (menu.level !== "bright") activate(sliceAt(ang));
 }
 
 function setDial(ang) {
