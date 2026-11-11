@@ -15,7 +15,7 @@ import * as share from "./share.js";
 
 const REPO = "https://github.com/ofeliper/nada-clock";
 
-export const VERSION = "0.7.3";
+export const VERSION = "0.8.0";
 
 const DATE_FORMATS = ["auto", "dmy", "mdy", "ymd", "short", "long"];
 const SEPARATORS = ["/", "-", "."];
@@ -115,7 +115,7 @@ function render() {
       <div class="segmented grid2" role="group" aria-label="${t("face.label")}">
         ${store.MODES.map((m) => `<button type="button" data-action="mode" data-value="${m}" aria-pressed="${store.currentMode(s) === m}">${t("mode." + m)}</button>`).join("")}
       </div>
-      <div class="row"><span class="row-label"><span class="row-hint">${t(custom ? "face.customHint" : inter ? "face.interactiveHint" : "face.minimalHint")}</span><span class="row-hint">${t("clock.swapHint")}</span></span>
+      <div class="row"><span class="row-label"><span class="row-hint">${t(custom ? "face.customHint" : inter ? "face.interactiveHint" : "face.minimalHint")}</span><span class="row-hint">${t("clock.swapHint")}</span><span class="row-hint">${t("radial.hint")}</span></span>
         ${inter ? `<button type="button" class="btn" data-action="edit-screen">${t("edit.open")}</button>` : ""}</div>
       <div class="swatches" role="group" aria-label="${t("theme.label")}">
         ${THEME_ORDER.map((th) => swatch(th, s.theme === th)).join("")}

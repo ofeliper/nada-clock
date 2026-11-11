@@ -1,7 +1,7 @@
 // NADA Clock — No Ads, Display Always
 import * as store from "./store.js";
 import * as weather from "./weather.js";
-import { resolveLanguage, setLanguage, translateStatic, t } from "./i18n.js";
+import { resolveLanguage, setLanguage, translateStatic, t, formatShortTime } from "./i18n.js";
 import { mountFace, updateFace, relayout } from "./faces.js";
 import * as settings from "./settings.js";
 import { THEMES, resolveTheme, onSystemChange } from "./themes.js";
@@ -13,6 +13,7 @@ import * as update from "./update.js";
 import { initPicker, openPicker } from "./picker.js";
 import * as share from "./share.js";
 import * as free from "./free.js";
+import * as radial from "./radial.js";
 
 const $ = (id) => document.getElementById(id);
 const stage = $("stage");
@@ -47,9 +48,36 @@ function isNightTime(now, start, end) {
 const COLOR_VARS = { bg: "--bg", fg: "--fg", hours: "--c-hours", minutes: "--c-minutes", seconds: "--c-seconds" };
 const themeMeta = document.querySelector('meta[name="theme-color"]');
 
+/** Próxima vez (depois de agora) que o relógio marca hh:mm. */
+function nextAt(hhmm, now = new Date()) {
+  const m = toMinutes(hhmm);
+  const d = new Date(now);
+  d.setHours(Math.floor(m / 60), m % 60, 0, 0);
+  if (d <= now) d.setDate(d.getDate() + 1);
+  return d;
+}
+
+/** Modo noturno agora: o "Ligado/Desligado agora" do menu circular vale até o horário marcado. */
+function nightOverride(now = new Date()) {
+  const o = store.get().nightOverride;
+  return o && now.getTime() < o.until ? o : null;
+}
+function nightNow(now = new Date()) {
+  const s = store.get();
+  const o = nightOverride(now);
+  if (o) return o.mode === "on";
+  return s.nightEnabled && isNightTime(now, s.nightStart, s.nightEnd);
+}
+function setNightMode(mode) {
+  const s = store.get();
+  if (mode === "on") store.set({ nightOverride: { mode, until: nextAt(s.nightEnd).getTime() } });
+  else if (mode === "off") store.set({ nightOverride: { mode, until: nextAt(s.nightStart).getTime() } });
+  else store.set({ nightOverride: null });
+}
+
 function applyTheme(now = new Date()) {
   const s = store.get();
-  const nightTime = s.nightEnabled && isNightTime(now, s.nightStart, s.nightEnd);
+  const nightTime = nightNow(now);
   const night = nightTime && s.nightColor !== false;   // usa a cor Noturno
   const theme = night ? "night" : resolveTheme(s.theme);
   const html = document.documentElement;
@@ -78,8 +106,7 @@ function applyTheme(now = new Date()) {
 }
 
 function nightActive(now = new Date()) {
-  const s = store.get();
-  return s.nightEnabled && isNightTime(now, s.nightStart, s.nightEnd);
+  return nightNow(now);
 }
 
 function isLight(hex) {
@@ -294,12 +321,12 @@ $("face-button").addEventListener("click", () => {
   });
 });
 
-$("rotate-button").addEventListener("click", () => {
+function toggleRotation() {
   const next = store.get().orientation === "landscape" ? "auto" : "landscape";
   pendingRotateAnim = true;
   store.set({ orientation: next });
-  showUI();
-});
+}
+$("rotate-button").addEventListener("click", () => { toggleRotation(); showUI(); });
 let pendingRotateAnim = false;
 
 // ---------------- Abas ----------------
@@ -355,9 +382,9 @@ function toAppPoint(x, y) {
   return { x, y };
 }
 
-// Segurar um elemento do Interativo: depois de um instante aparece um anel que vai
-// enchendo; ao completar, abre a edição com o elemento já selecionado.
-const HOLD_EDIT_DELAY = 280, HOLD_EDIT_MS = 900;
+// Segurar a tela: depois de um instante aparece um anel que vai enchendo;
+// ao completar, abre o menu circular em volta do dedo (js/radial.js).
+const HOLD_EDIT_DELAY = 180, HOLD_EDIT_MS = 450;
 const holdEdit = $("hold-edit");
 rootStyle.setProperty("--hold-edit-ms", HOLD_EDIT_MS + "ms");
 
@@ -376,7 +403,10 @@ function startHoldEdit(g, el, e) {
       g.holdDone = true;
       cancelHoldEdit(g);
       try { navigator.vibrate?.(12); } catch { /* ok */ }
-      startEditing(el.dataset.id);
+      hideUI();
+      radial.openAt(g.lastX ?? e.clientX, g.lastY ?? e.clientY, {
+        target: el ? { id: el.dataset.id, label: el.dataset.placeholder || "" } : null,
+      });
     }, HOLD_EDIT_DELAY + HOLD_EDIT_MS),
   ];
 }
@@ -398,13 +428,17 @@ stage.addEventListener("pointerdown", (e) => {
     t0: performance.now(),
     moved: false,
   };
-  const iel = store.get().face === "interactive" && store.get().tab === "clock" && e.target.closest(".iel");
-  if (iel) startHoldEdit(gesture, iel, e);
+  if (radial.isOpen()) radial.close();
+  const iel = store.get().face === "interactive" && store.get().tab === "clock" ? e.target.closest(".iel") : null;
+  startHoldEdit(gesture, iel, e);
   try { stage.setPointerCapture(e.pointerId); } catch { /* ok */ }
 });
 
 stage.addEventListener("pointermove", (e) => {
   if (!gesture || e.pointerId !== gesture.id) return;
+  gesture.lastX = e.clientX;
+  gesture.lastY = e.clientY;
+  if (gesture.holdDone) { radial.dragMove(e.clientX, e.clientY); return; }
   const { dx, dy } = toAppDelta(e.clientX - gesture.startX, e.clientY - gesture.startY); // dy > 0 = para cima
   gesture.dx = dx;
   gesture.dy = dy;
@@ -426,7 +460,7 @@ function endGesture(e) {
   const g = gesture;
   gesture = null;
   cancelHoldEdit(g);
-  if (g.holdDone) return;             // virou edição: não mostra/esconde a barra
+  if (g.holdDone) { radial.dragEnd(e.clientX, e.clientY, e.type !== "pointerup"); return; } // virou menu circular
   if (g.moved) {
     if (g.value != null) store.set({ brightness: g.value });
   } else if (g.horizontal) {
@@ -517,7 +551,8 @@ store.subscribe((s, patch) => {
   if ("pomo" in patch) pomodoro.render();
   if ("location" in patch) weather.tick();
   if ("tab" in patch) applyTab();
-  if (["theme", "nightEnabled", "nightStart", "nightEnd", "face", "custom", "uiTheme"].some((k) => k in patch)) applyTheme();
+  if (["theme", "nightEnabled", "nightStart", "nightEnd", "nightOverride", "face", "custom", "uiTheme"].some((k) => k in patch)) applyTheme();
+  if ("language" in patch) radial.refresh();
   if ("orientation" in patch || "rotateDir" in patch) { applyOrientation(pendingRotateAnim || "orientation" in patch); pendingRotateAnim = false; }
   if ("burnIn" in patch) applyBurnIn();
   if ("mirror" in patch) applyMirror();
@@ -545,6 +580,39 @@ free.init({
 });
 applyFace();
 $("edit-button").addEventListener("click", startEditing);
+
+radial.init({
+  toAppPoint,
+  state: () => {
+    const s = store.get();
+    const o = nightOverride();
+    return {
+      interactive: s.face === "interactive",
+      mode: store.currentMode(),
+      tab: s.tab,
+      night: o ? o.mode : "auto",
+      nightUntil: o ? formatShortTime(new Date(o.until)) : "",
+      brightness: s.brightness,
+      minBrightness: MIN_BRIGHTNESS,
+    };
+  },
+  brightness: (v, commit) => {
+    if (commit) store.set({ brightness: v });
+    else applyBrightness(v);
+  },
+  act: (id, { target }) => {
+    const [kind, value] = id.split(":");
+    switch (kind) {
+      case "edit": startEditing(target?.id || null); break;
+      case "mode": store.setMode(value); break;
+      case "tab": store.set({ tab: value }); break;
+      case "night": setNightMode(value); break;
+      case "lock": setLocked(true); break;
+      case "rotate": toggleRotation(); break;
+      case "settings": settings.open(); break;
+    }
+  },
+});
 timers.init({
   changed: updateTabDots,
   finished: () => { if (store.get().tab !== "timer") store.set({ tab: "timer" }); },

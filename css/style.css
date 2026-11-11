@@ -1072,3 +1072,30 @@ html.narrow[data-face="interactive"][data-tab="clock"] .bar-btn { width: 34px; }
 html.narrow[data-face="interactive"][data-tab="clock"] .tab { padding: 9px 8px; }
 .segmented.grid2 { display: grid; grid-template-columns: 1fr 1fr; }
 html.editing .iel.is-empty::after { content: attr(data-placeholder); opacity: 0.45; font-style: italic; padding: 0.1em 0.3em; }
+
+/* =========================================================
+   v0.8 — menu circular
+   ========================================================= */
+.radial {
+  position: fixed; inset: 0; z-index: 26; touch-action: none;
+  background: rgba(0, 0, 0, 0.5); opacity: 0; transition: opacity 0.12s ease;
+}
+.radial.visible { opacity: 1; }
+.radial svg { position: absolute; left: 0; top: 0; overflow: visible; font-family: var(--font-ui); }
+html.radial-open .shift { filter: blur(2px); }
+.rm-slice { fill: rgba(28, 28, 30, 0.94); stroke: rgba(255, 255, 255, 0.10); stroke-width: 1; transition: fill 0.08s; }
+.rm-slice.on { fill: #0a84ff; }
+.rm-ic { color: #fff; }
+.rm-ic svg { overflow: visible; }
+.rm-label { fill: #c8c8cc; font-size: 10.5px; font-weight: 500; }
+.rm-label.on { fill: #fff; font-weight: 700; }
+.rm-dot { fill: #0a84ff; }
+.rm-slice.on ~ .rm-dot { fill: #fff; }
+.rm-center { fill: rgba(44, 44, 46, 0.97); stroke: rgba(255, 255, 255, 0.15); }
+.rm-center-t { fill: #fff; font-weight: 650; }
+.rm-center-t.sub { fill: #aaa; font-weight: 400; }
+.rm-dial-bg { fill: rgba(28, 28, 30, 0.94); stroke: rgba(255, 255, 255, 0.10); }
+.rm-track { fill: none; stroke: rgba(255, 255, 255, 0.12); stroke-linecap: round; }
+.rm-fill { fill: none; stroke: #0a84ff; stroke-linecap: round; }
+.rm-knob { fill: #fff; stroke: rgba(0, 0, 0, 0.25); stroke-width: 1; }
+@media (prefers-reduced-motion: reduce) { .radial { transition: none; } }

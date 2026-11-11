@@ -4,7 +4,7 @@
 
 Funciona como um app instalado na Tela de Início (PWA): tela cheia, tela sempre ligada, funciona offline.
 
-## Funcionalidades (v0.7.3)
+## Funcionalidades (v0.8.0)
 
 - Quatro abas: **Relógio**, **Timer**, **Cronômetro** e **Pomodoro** — troque pela barra do topo (aparece com um toque) ou deslizando para o lado
 - **Timer**: vários ao mesmo tempo, com nome (ex.: "macarrão", "forno")
@@ -14,6 +14,10 @@ Funciona como um app instalado na Tela de Início (PWA): tela cheia, tela sempre
 - **Cronômetro**: voltas (parcial e total), pausa e zerar; o estado fica salvo
 - Relógio **digital** (12/24h, segundos, dois-pontos piscando, 6 fontes incluindo **LED de 7 segmentos**, estilo **plaquinha/flip**) ou **analógico** — as opções valem para os dois mostradores
 - **Barra de controle** (aparece com um toque): girar, **mostradores** (Minimalista digital, Minimalista analógico, Customizado, Interativo), editar a tela, abas, bloquear e configurações
+- **Menu circular**: segure a tela (em qualquer aba e mostrador) e um anel de opções abre em volta do dedo
+  - Rápido: sem soltar, deslize na direção da opção e solte. Calmo: solte no meio e toque na opção; o ✕ fecha
+  - Editar item (só no Interativo), Mostradores ›, Ferramentas › (Relógio, Timer, Cronômetro, Pomodoro), Brilho › (anel de girar), Noturno › (Programado, Ligado agora, Desligado agora), Bloquear, Girar, Ajustes
+  - "Ligado agora" vale até o fim do horário noturno; "Desligado agora", até o próximo início
 - Mostrador **Minimalista** (digital ou analógico): relógio + dia e data (acima ou abaixo, coladinhos no relógio)
 - Mostrador **Customizado**: 11 posições (bordas de cima e de baixo, logo acima/abaixo do relógio e laterais)
   - Arraste uma posição sobre outra para trocar — inclusive o relógio, que pode ir para qualquer lugar
@@ -23,7 +27,7 @@ Funciona como um app instalado na Tela de Início (PWA): tela cheia, tela sempre
   - Cores personalizadas: fundo, principal e uma cor para horas, minutos e segundos
 - Mostrador **Interativo (beta)**, o padrão: monte a tela à mão, direto no relógio
   - Na edição, a tela aparece reduzida e as opções ficam numa gaveta ao lado (deitado) ou embaixo (em pé), sem cobrir nada
-  - Toque no lápis da barra (ou em Configurações → Editar a tela), ou **segure um elemento**: um anel enche e a edição abre com ele já selecionado
+  - Toque no lápis da barra (ou em Configurações → Editar a tela), ou segure um elemento e escolha **Editar item** no menu circular
   - **＋ Adicionar** qualquer componente (inclusive mais de um relógio) e arraste para onde quiser
   - "Ímã": o elemento gruda no centro, nas margens e no alinhamento dos outros, com linhas-guia
   - Cada elemento tem tamanho (barra, −/+ ou pinça com dois dedos), cor, opacidade, alinhamento e fonte próprios, além das opções do tipo (fuso, texto, relógio digital/analógico…)
@@ -90,6 +94,7 @@ css/style.css           visual e paletas
 js/app.js               início, gestos, brilho, wake lock, burn-in, modo noturno
 js/faces.js             motor da grade 3x3 (Minimalista e Customizado)
 js/free.js              mostrador Interativo: elementos livres e editor na tela
+js/radial.js            menu circular (segurar a tela)
 js/components.js        componentes (relógios, data, fuso, progresso, lua, contagem, texto)
 js/tokens.js            placeholders do texto livre
 js/themes.js            paletas e modo Sistema

@@ -129,6 +129,7 @@ export const DEFAULTS = {
   nightEnabled: false,
   nightStart: "22:00",
   nightEnd: "07:00",
+  nightOverride: null,     // "Ligado/Desligado agora" do menu circular: { mode, until }
   nightColor: true,        // no horário noturno, usa a cor Noturno (vermelho)
   nightBrightness: 1,      // brilho máximo no horário noturno (1 = não muda)
   burnIn: true,
