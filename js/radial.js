@@ -123,12 +123,32 @@ function centerText() {
 
 /** Abre no ponto do dedo (coordenadas da tela). target = elemento do Interativo embaixo do dedo. */
 export function openAt(clientX, clientY, { target = null } = {}) {
+  clearTimeout(hideTimer);
+  root.querySelectorAll(".rm-ghost").forEach((n) => n.remove());
   menu = { mode: "drag", target, hi: -1, level: "main", items: [] };
   placeAt(hooks.toAppPoint(clientX, clientY));
   root.hidden = false;
   document.documentElement.classList.add("radial-open");
-  show("main");
+  show("main", false);
   requestAnimationFrame(() => root.classList.add("visible"));
+}
+
+/**
+ * Troca suave: o desenho atual some (fade out) enquanto o novo aparece (fade in).
+ * Usado ao trocar de anel e quando o menu muda de lugar, para nada "pular" de repente.
+ */
+const FADE_MS = 180;
+let hideTimer = null;
+function crossfade() {
+  if (!svg.firstChild) return;
+  const ghost = svg.cloneNode(true);
+  ghost.classList.add("rm-ghost");
+  ghost.classList.remove("rm-in");
+  root.appendChild(ghost);
+  setTimeout(() => ghost.remove(), FADE_MS + 60);
+  svg.classList.remove("rm-in");
+  void svg.getBoundingClientRect();   // reinicia a animação
+  svg.classList.add("rm-in");
 }
 
 /**
@@ -149,13 +169,20 @@ export function close() {
   clearTimers();
   if (!menu) return;
   menu = null;
+  // some com fade; só esconde de vez quando terminar (se não tiver reaberto antes)
   root.classList.remove("visible");
   document.documentElement.classList.remove("radial-open");
-  root.hidden = true;
-  svg.innerHTML = "";
+  clearTimeout(hideTimer);
+  hideTimer = setTimeout(() => {
+    if (menu) return;
+    root.hidden = true;
+    svg.innerHTML = "";
+    root.querySelectorAll(".rm-ghost").forEach((n) => n.remove());
+  }, FADE_MS);
 }
 
-function show(level) {
+function show(level, fade = true) {
+  if (fade) crossfade();
   menu.level = level;
   menu.hi = -1;
   menu.items = level === "bright" ? [] : itemsFor(level);
@@ -175,6 +202,8 @@ function render() {
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
   svg.setAttribute("width", W);
   svg.setAttribute("height", H);
+  svg.style.setProperty("--rm-cx", menu.cx + "px");
+  svg.style.setProperty("--rm-cy", menu.cy + "px");
   let g = "";
   if (menu.level === "bright") g = renderDial();
   else {
@@ -298,7 +327,7 @@ function startDrag(p, pointerId, move) {
   menu.dragPointer = pointerId;
   menu.press = null;
   menu.hi = -1;
-  if (move) placeAt(p); else { menu.ox = p.x; menu.oy = p.y; }
+  if (move) { crossfade(); placeAt(p); } else { menu.ox = p.x; menu.oy = p.y; }
   render();
 }
 

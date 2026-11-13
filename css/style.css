@@ -1078,10 +1078,15 @@ html.editing .iel.is-empty::after { content: attr(data-placeholder); opacity: 0.
    ========================================================= */
 .radial {
   position: fixed; inset: 0; z-index: 26; touch-action: none;
-  background: rgba(0, 0, 0, 0.5); opacity: 0; transition: opacity 0.12s ease;
+  background: rgba(0, 0, 0, 0.5); opacity: 0; transition: opacity 0.18s ease;
 }
 .radial.visible { opacity: 1; }
-.radial svg { position: absolute; left: 0; top: 0; overflow: visible; font-family: var(--font-ui); }
+.radial:not(.visible) { pointer-events: none; }
+.radial svg.rm-in { animation: rm-in 0.18s ease both; }
+.radial svg.rm-ghost { pointer-events: none; animation: rm-out 0.18s ease both; }
+@keyframes rm-in { from { opacity: 0; transform: scale(0.97); } }
+@keyframes rm-out { to { opacity: 0; transform: scale(0.97); } }
+.radial svg { position: absolute; left: 0; top: 0; overflow: visible; font-family: var(--font-ui); transform-origin: var(--rm-cx, 50%) var(--rm-cy, 50%); }
 html.radial-open .shift { filter: blur(2px); }
 .rm-slice { fill: rgba(28, 28, 30, 0.94); stroke: rgba(255, 255, 255, 0.10); stroke-width: 1; transition: fill 0.08s; }
 .rm-slice.on { fill: #0a84ff; }
@@ -1098,7 +1103,7 @@ html.radial-open .shift { filter: blur(2px); }
 .rm-track { fill: none; stroke: rgba(255, 255, 255, 0.12); stroke-linecap: round; }
 .rm-fill { fill: none; stroke: #0a84ff; stroke-linecap: round; }
 .rm-knob { fill: #fff; stroke: rgba(0, 0, 0, 0.25); stroke-width: 1; }
-@media (prefers-reduced-motion: reduce) { .radial { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .radial { transition: none; } .radial svg.rm-in, .radial svg.rm-ghost { animation-duration: 0.01s; } }
 /* modo rápido: parado sobre uma opção com ›, a borda enche e o submenu abre */
 .rm-dwell { fill: none; stroke: #fff; stroke-width: 3; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; animation: rm-fill 0.42s linear forwards; }
 /* segurar fora do menu aberto: anel enche e o menu vem até o dedo */
