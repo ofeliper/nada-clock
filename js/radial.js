@@ -57,7 +57,11 @@ export function init(h) {
   root.addEventListener("pointerdown", onDown);
   root.addEventListener("pointermove", onMove);
   root.addEventListener("pointerup", onUp);
-  root.addEventListener("pointercancel", () => { if (menu) menu.press = null; });
+  root.addEventListener("pointercancel", (e) => {
+    if (!menu) return;
+    if (menu.mode === "drag" && menu.dragPointer === e.pointerId) { dragEnd(e.clientX, e.clientY, true); return; }
+    clearTimeout(rearmTimer); menu.rearm = null; menu.press = null; render();
+  });
   // reserva: alguns navegadores (iOS) às vezes não entregam o pointerup; o click sempre chega
   root.addEventListener("click", onClick);
   document.addEventListener("keydown", (e) => {
@@ -69,7 +73,7 @@ export function init(h) {
 // ---------------- Itens de cada anel ----------------
 function itemsFor(level) {
   const s = hooks.state();
-  const item = (id, label, extra = {}) => ({ id, label, icon: ICONS[extra.icon || id], ...extra });
+  const item = (id, label, extra = {}) => ({ id, label, ...extra, icon: ICONS[extra.icon || id] });
   const back = item("back", t("radial.back"));
   switch (level) {
     case "faces":
@@ -119,22 +123,30 @@ function centerText() {
 
 /** Abre no ponto do dedo (coordenadas da tela). target = elemento do Interativo embaixo do dedo. */
 export function openAt(clientX, clientY, { target = null } = {}) {
-  const p = hooks.toAppPoint(clientX, clientY);
-  const W = root.clientWidth || innerWidth, H = root.clientHeight || innerHeight;
-  const lim = R2 + MARGIN;
-  menu = {
-    cx: Math.min(Math.max(p.x, lim), Math.max(lim, W - lim)),
-    cy: Math.min(Math.max(p.y, lim), Math.max(lim, H - lim)),
-    ox: p.x, oy: p.y,   // onde o dedo estava ao abrir (o menu pode ter sido empurrado para caber)
-    mode: "drag", target, hi: -1, level: "main", items: [],
-  };
+  menu = { mode: "drag", target, hi: -1, level: "main", items: [] };
+  placeAt(hooks.toAppPoint(clientX, clientY));
   root.hidden = false;
   document.documentElement.classList.add("radial-open");
   show("main");
   requestAnimationFrame(() => root.classList.add("visible"));
 }
 
+/**
+ * Centraliza o menu no dedo, empurrando para dentro da tela se não couber.
+ * A direção do modo rápido é medida a partir do dedo (ox, oy), não do centro,
+ * então funciona igual mesmo quando o menu foi empurrado.
+ */
+function placeAt(p) {
+  const W = root.clientWidth || innerWidth, H = root.clientHeight || innerHeight;
+  const lim = R2 + MARGIN;
+  menu.cx = Math.min(Math.max(p.x, lim), Math.max(lim, W - lim));
+  menu.cy = Math.min(Math.max(p.y, lim), Math.max(lim, H - lim));
+  menu.ox = p.x;
+  menu.oy = p.y;
+}
+
 export function close() {
+  clearTimers();
   if (!menu) return;
   menu = null;
   root.classList.remove("visible");
@@ -176,12 +188,26 @@ function render() {
       const [ix, iy] = polar((R1 + R2) / 2 + 3, a);
       g += `<g class="rm-ic${on ? " on" : ""}" transform="translate(${ix - 12} ${iy - 20})">${svgIcon(it.icon)}</g>`;
       g += `<text class="rm-label${on ? " on" : ""}" x="${ix}" y="${iy + 20}" text-anchor="middle">${esc(it.label)}${it.sub ? " ›" : ""}</text>`;
+      if (on && it.sub && menu.mode === "drag") {
+        const [p0x, p0y] = polar(R2 - 4, a0), [p1x, p1y] = polar(R2 - 4, a1);
+        g += `<path class="rm-dwell" pathLength="1" d="M${p0x} ${p0y}A${R2 - 4} ${R2 - 4} 0 0 1 ${p1x} ${p1y}"/>`;
+      }
       if (it.current) {
         const [dx, dy] = polar(R2 - 10, a);
         g += `<circle class="rm-dot" cx="${dx}" cy="${dy}" r="3.2"/>`;
       }
     });
     g += centerCircle(centerText());
+  }
+  if (menu.rearm) {
+    const { x, y } = menu.rearm;
+    const W = root.clientWidth || innerWidth, H = root.clientHeight || innerHeight;
+    let rx = Math.min(Math.max(x, 36), W - 36);
+    let ry = y - 64 < 36 ? y + 64 : y - 64;
+    ry = Math.min(Math.max(ry, 36), H - 36);
+    if (Math.abs(ry - y) < 50 && Math.abs(rx - x) < 50) rx = x - 64 < 36 ? x + 64 : x - 64;   // não fica embaixo do dedo
+    g += `<g class="rm-rearm"><circle cx="${rx}" cy="${ry}" r="30" class="bg"/><circle cx="${rx}" cy="${ry}" r="26" class="track"/>`
+      + `<circle cx="${rx}" cy="${ry}" r="26" class="fg" pathLength="1" transform="rotate(-90 ${rx} ${ry})"/></g>`;
   }
   svg.innerHTML = g;
 }
@@ -249,26 +275,67 @@ function sliceAt(ang) {
   return ((Math.round((ang - START) / step()) % n) + n) % n;
 }
 
-/** Modo rápido: vale a direção em que o dedo andou desde que o menu abriu. */
+/** Modo rápido: vale a direção em que o dedo andou desde (ox, oy). */
 const DRAG_MIN = 28;
+const DWELL_MS = 420;    // parado sobre uma opção com ›: abre o submenu sem soltar
+const REARM_MS = 400;    // segurar fora do menu aberto: o menu vem até o dedo, no modo rápido
+let dwellTimer = null, rearmTimer = null;
+
+function clearTimers() {
+  clearTimeout(dwellTimer); dwellTimer = null;
+  clearTimeout(rearmTimer); rearmTimer = null;
+}
+
 function dragSlice(clientX, clientY) {
   const p = hooks.toAppPoint(clientX, clientY);
   const dx = p.x - menu.ox, dy = p.y - menu.oy;
   return Math.hypot(dx, dy) > DRAG_MIN ? sliceAt(Math.atan2(dy, dx)) : -1;
 }
 
-/** Movimento do dedo ainda pressionado desde que o menu abriu (modo rápido). */
-export function dragMove(clientX, clientY) {
-  if (!menu || menu.mode !== "drag") return;
-  const hi = dragSlice(clientX, clientY);
-  if (hi !== menu.hi) { menu.hi = hi; render(); }
+/** Entra no modo rápido a partir do ponto p (coordenadas do app). */
+function startDrag(p, pointerId, move) {
+  menu.mode = "drag";
+  menu.dragPointer = pointerId;
+  menu.press = null;
+  menu.hi = -1;
+  if (move) placeAt(p); else { menu.ox = p.x; menu.oy = p.y; }
+  render();
 }
 
-/** Soltou o dedo do gesto de abrir: escolhe a opção apontada, ou deixa o menu aberto. */
+/** Movimento do dedo pressionado no modo rápido. */
+export function dragMove(clientX, clientY) {
+  if (!menu || menu.mode !== "drag") return;
+  if (menu.level === "bright") {
+    const { dist, ang } = locate(clientX, clientY);
+    if (dist > R1 * 0.75) setDial(ang);
+    return;
+  }
+  const hi = dragSlice(clientX, clientY);
+  if (hi === menu.hi) return;
+  menu.hi = hi;
+  clearTimeout(dwellTimer);
+  const it = menu.items[hi];
+  if (it?.sub) {
+    dwellTimer = setTimeout(() => {
+      if (!menu || menu.mode !== "drag" || menu.items[menu.hi] !== it) return;
+      // abre o submenu centrado no dedo e continua no modo rápido
+      try { navigator.vibrate?.(8); } catch { /* ok */ }
+      if (it.id === "bright") menu.dial = hooks.state().brightness;
+      placeAt(hooks.toAppPoint(clientX, clientY));
+      show(it.id);
+    }, DWELL_MS);
+  }
+  render();
+}
+
+/** Soltou o dedo no modo rápido: escolhe a opção apontada, ou deixa o menu aberto (modo calmo). */
 export function dragEnd(clientX, clientY, cancelled = false) {
   if (!menu || menu.mode !== "drag") return;
+  clearTimers();
   menu.mode = "tap";
+  menu.dragPointer = null;
   menu.handledAt = performance.now();   // ignora o click que o navegador gera ao soltar
+  if (menu.level === "bright") { if (menu.dial != null) hooks.brightness(menu.dial, true); render(); return; }
   if (cancelled) { menu.hi = -1; render(); return; }
   const hi = dragSlice(clientX, clientY);
   if (hi >= 0) activate(hi);
@@ -278,44 +345,85 @@ export function dragEnd(clientX, clientY, cancelled = false) {
 function onDown(e) {
   if (!menu) return;
   // o "soltar" do dedo que abriu o menu se perdeu (acontece no iOS): passa para o modo calmo
-  if (menu.mode === "drag") { menu.mode = "tap"; menu.hi = -1; render(); }
+  if (menu.mode === "drag") { clearTimers(); menu.mode = "tap"; menu.hi = -1; render(); }
   e.preventDefault();
   e.stopPropagation();
   try { root.setPointerCapture(e.pointerId); } catch { /* ok */ }
+  const p = hooks.toAppPoint(e.clientX, e.clientY);
   const { dist, ang } = locate(e.clientX, e.clientY);
+  if (dist > R2) {
+    // fora: tocar fecha; segurar traz o menu até o dedo, no modo rápido
+    menu.press = { outside: true, sx: p.x, sy: p.y, id: e.pointerId };
+    rearmTimer = setTimeout(() => {
+      if (!menu?.press?.outside) return;
+      menu.rearm = null;
+      try { navigator.vibrate?.(10); } catch { /* ok */ }
+      menu.target = targetAt(e.clientX, e.clientY);
+      if (menu.level === "main") menu.items = itemsFor("main");
+      startDrag(p, e.pointerId, true);
+    }, REARM_MS);
+    setTimeout(() => { if (menu?.press?.outside) { menu.rearm = { x: p.x, y: p.y }; render(); } }, 120);
+    return;
+  }
   if (menu.level === "bright") {
     if (dist < R1) { menu.press = { center: true }; return; }
-    if (dist > R2) { menu.press = { outside: true }; return; }
     menu.press = { dial: true };
     setDial(ang);
     return;
   }
-  if (dist < R1) menu.press = { center: true };
-  else if (dist > R2) menu.press = { outside: true };
+  // centro: tocar fecha; encostar e arrastar já é o modo rápido
+  if (dist < R1) menu.press = { center: true, sx: p.x, sy: p.y, id: e.pointerId };
   else { menu.press = { slice: sliceAt(ang) }; menu.hi = menu.press.slice; render(); }
 }
 
 function onMove(e) {
-  if (!menu?.press) return;
+  if (!menu) return;
+  if (menu.mode === "drag" && menu.dragPointer === e.pointerId) { dragMove(e.clientX, e.clientY); return; }
+  const press = menu.press;
+  if (!press) return;
+  const p = hooks.toAppPoint(e.clientX, e.clientY);
+  if (press.outside) {
+    if (Math.hypot(p.x - press.sx, p.y - press.sy) > 12) { clearTimeout(rearmTimer); menu.rearm = null; press.moved = true; render(); }
+    return;
+  }
+  if (press.center && press.sx != null) {
+    if (Math.hypot(p.x - press.sx, p.y - press.sy) > DRAG_MIN / 2) {
+      startDrag({ x: press.sx, y: press.sy }, e.pointerId, false);
+      dragMove(e.clientX, e.clientY);
+    }
+    return;
+  }
   const { dist, ang } = locate(e.clientX, e.clientY);
-  if (menu.press.dial) { setDial(ang); return; }
-  if (menu.press.slice != null) {
+  if (press.dial) { setDial(ang); return; }
+  if (press.slice != null) {
     const hi = dist > R1 && dist < R2 + 24 ? sliceAt(ang) : -1;
     if (hi !== menu.hi) { menu.hi = hi; render(); }
   }
 }
 
 function onUp(e) {
-  if (!menu?.press) return;
+  if (!menu) return;
+  if (menu.mode === "drag" && menu.dragPointer === e.pointerId) { dragEnd(e.clientX, e.clientY, e.type !== "pointerup"); return; }
+  if (!menu.press) return;
   const press = menu.press;
   menu.press = null;
   menu.handledAt = performance.now();
+  clearTimeout(rearmTimer);
+  if (menu.rearm) { menu.rearm = null; render(); }
   const { dist, ang } = locate(e.clientX, e.clientY);
   if (press.dial) { hooks.brightness(menu.dial, true); return; }
   if (press.center) { centerTap(); return; }
-  if (press.outside) { close(); return; }
+  if (press.outside) { if (!press.moved) close(); return; }
   if (press.slice != null && dist > R1 && dist <= R2 + 24) activate(sliceAt(ang));
   else { menu.hi = -1; render(); }
+}
+
+/** Elemento do Interativo embaixo do dedo (o menu cobre a tela, então procura por baixo dele). */
+function targetAt(clientX, clientY) {
+  const s = hooks.state();
+  if (!s.interactive || s.tab !== "clock") return null;
+  const el = document.elementsFromPoint(clientX, clientY).find((n) => n.classList?.contains("iel"));
+  return el ? { id: el.dataset.id, label: el.dataset.placeholder || "" } : null;
 }
 
 function centerTap() {
@@ -327,6 +435,7 @@ function centerTap() {
 function onClick(e) {
   if (!menu) return;
   if (menu.handledAt && performance.now() - menu.handledAt < 600) return;  // já tratado
+  if (menu.mode === "drag" && menu.dragPointer != null) return;
   menu.mode = "tap";
   menu.press = null;
   const { dist, ang } = locate(e.clientX, e.clientY);

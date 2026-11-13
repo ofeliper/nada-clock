@@ -4,7 +4,7 @@
 
 Funciona como um app instalado na Tela de Início (PWA): tela cheia, tela sempre ligada, funciona offline.
 
-## Funcionalidades (v0.8.1)
+## Funcionalidades (v0.8.2)
 
 - Quatro abas: **Relógio**, **Timer**, **Cronômetro** e **Pomodoro** — troque pela barra do topo (aparece com um toque) ou deslizando para o lado
 - **Timer**: vários ao mesmo tempo, com nome (ex.: "macarrão", "forno")
@@ -16,6 +16,8 @@ Funciona como um app instalado na Tela de Início (PWA): tela cheia, tela sempre
 - **Barra de controle** (aparece com um toque): girar, **mostradores** (Minimalista digital, Minimalista analógico, Customizado, Interativo), editar a tela, abas, bloquear e configurações
 - **Menu circular**: segure a tela (em qualquer aba e mostrador) e um anel de opções abre em volta do dedo
   - Rápido: sem soltar, deslize na direção da opção e solte. Calmo: solte no meio e toque na opção; o ✕ fecha
+  - Com o menu aberto (modo calmo): segure fora dele e o menu vem até o dedo no modo rápido; ou encoste no centro e arraste
+  - No modo rápido, pare um instante sobre uma opção com › e o submenu abre ali mesmo, sem soltar
   - Editar item (só no Interativo), Mostradores ›, Ferramentas › (Relógio, Timer, Cronômetro, Pomodoro), Brilho › (anel de girar), Noturno › (Programado, Ligado agora, Desligado agora), Bloquear, Girar, Ajustes
   - "Ligado agora" vale até o fim do horário noturno; "Desligado agora", até o próximo início
 - Mostrador **Minimalista** (digital ou analógico): relógio + dia e data (acima ou abaixo, coladinhos no relógio)
