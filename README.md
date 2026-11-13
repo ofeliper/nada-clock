@@ -4,7 +4,7 @@
 
 Funciona como um app instalado na Tela de Início (PWA): tela cheia, tela sempre ligada, funciona offline.
 
-## Funcionalidades (v0.8.3)
+## Funcionalidades (v0.9.0)
 
 - Quatro abas: **Relógio**, **Timer**, **Cronômetro** e **Pomodoro** — troque pela barra do topo (aparece com um toque) ou deslizando para o lado
 - **Timer**: vários ao mesmo tempo, com nome (ex.: "macarrão", "forno")
@@ -34,6 +34,8 @@ Funciona como um app instalado na Tela de Início (PWA): tela cheia, tela sempre
   - "Ímã": o elemento gruda no centro, nas margens e no alinhamento dos outros, com linhas-guia
   - Cada elemento tem tamanho (barra, −/+ ou pinça com dois dedos), cor, opacidade, alinhamento e fonte próprios, além das opções do tipo (fuso, texto, relógio digital/analógico…)
   - Duplicar, trazer para a frente, remover; setas do teclado movem, Delete remove
+  - **Adicionar elemento** com busca pelo nome e categorias (Todas, Relógio e data, Clima, Astronomia, Contagens, Texto, Sistema), mostrando o valor atual de cada item
+  - **Sistema**: versão do app, data da atualização, mostrador, tipo de relógio, brilho, modo noturno, tela sempre acesa, conexão, idioma, fuso, localização, hora do clima e orientação (também como variáveis do Texto, ex.: `{version}`, `{brightness}`)
   - Layouts separados para a tela deitada e em pé; **Padrão** volta ao layout inicial
 - 7 paletas: **Sistema** (padrão; segue o modo claro/escuro do aparelho), Terminal, Âmbar, Neve, Gelo, Noturno e Papel (clara)
 - **Restaurar padrão** nas configurações
@@ -97,6 +99,8 @@ js/app.js               início, gestos, brilho, wake lock, burn-in, modo noturn
 js/faces.js             motor da grade 3x3 (Minimalista e Customizado)
 js/free.js              mostrador Interativo: elementos livres e editor na tela
 js/radial.js            menu circular (segurar a tela)
+js/awake.js             tela sempre acesa (Wake Lock + vídeo mudo de reserva)
+js/sysinfo.js           informações do sistema para pôr na tela
 js/components.js        componentes (relógios, data, fuso, progresso, lua, contagem, texto)
 js/tokens.js            placeholders do texto livre
 js/themes.js            paletas e modo Sistema

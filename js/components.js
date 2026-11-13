@@ -4,6 +4,7 @@ import * as store from "./store.js";
 import { t, formatDate, formatWeekday, getLanguage } from "./i18n.js";
 import { expand, tempWithCondition, weatherExtra, weatherData } from "./tokens.js";
 import { conditionIcon } from "./weather.js";
+import * as sysinfo from "./sysinfo.js";
 
 const pad = (n) => String(n).padStart(2, "0");
 const esc = (str) => String(str).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -418,8 +419,19 @@ export function createSlotComponent(cfg = {}) {
     case "sun": return sun();
     case "countdown": return countdown(cfg);
     case "text": return freeText(cfg);
+    case "system": return systemInfo(cfg);
     default: return null;
   }
+}
+
+/** Informação do sistema (versão, brilho, modo noturno…), com rótulo opcional. */
+function systemInfo(cfg) {
+  const key = cfg.key || "version";
+  return textComponent(() => {
+    const v = sysinfo.value(key);
+    if (!v) return "";
+    return esc(cfg.showLabel ? `${sysinfo.label(key)}: ${v}` : v);
+  });
 }
 
 /** Relógio (digital ou analógico) com as opções compartilhadas. */

@@ -11,8 +11,26 @@ import { t } from "./i18n.js";
 import { createClock, createSlotComponent, SLOT_TYPES, ZONES, zoneCity, WEATHER_EXTRAS } from "./components.js";
 import { TOKENS, expand } from "./tokens.js";
 import { enhanceSelects, handleSelectTap } from "./picker.js";
+import * as sysinfo from "./sysinfo.js";
 
 export const ELEMENT_TYPES = ["clock", ...SLOT_TYPES.filter((x) => x !== "empty")];
+
+// Catálogo da tela "Adicionar elemento": categorias, busca e prévia do valor atual.
+const CATEGORIES = ["all", "time", "weather", "sky", "count", "text", "system"];
+const TYPE_CAT = {
+  clock: "time", weekdayDate: "time", weekday: "time", date: "time", timezone: "time",
+  temperature: "weather", moon: "sky", sun: "sky", countdown: "count", progress: "count", text: "text",
+};
+function catalog() {
+  const list = ELEMENT_TYPES.map((type) => ({ type, cat: TYPE_CAT[type] || "text", name: label(type), opts: null }));
+  for (const key of sysinfo.SYS_KEYS) list.push({ type: "system", cat: "system", name: sysinfo.label(key), opts: { key } });
+  return list;
+}
+const fold = (str) => String(str || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+let addCat = "all";
+let addQuery = "";
+try { addCat = localStorage.getItem("nada-clock:addCat") || "all"; } catch { /* ok */ }
+if (!CATEGORIES.includes(addCat)) addCat = "all";
 const COLORS = [null, "#33ff66", "#ffb000", "#e8e8e8", "#5ac8fa", "#b3261e", "#ff7eb6", "#b69cff", "#2b2b2b"];
 const FONTS = ["rounded", "thin", "regular", "bold", "mono"];
 const CLOCK_FONTS = ["rounded", "thin", "regular", "bold", "mono", "led"];
@@ -97,7 +115,7 @@ export function mount(force = false) {
     el.className = "iel";
     el.dataset.id = data.id;
     el.dataset.type = data.type;
-    el.dataset.placeholder = label(data.type);
+    el.dataset.placeholder = labelFor(data);
     el.tabIndex = editing ? 0 : -1;
     const body = document.createElement("div");
     body.className = "iel-body";
@@ -274,7 +292,7 @@ function changeOpts(id, patch, opts = {}) {
   changed(id, {}, { remount: true, ...opts });
 }
 
-function addElement(type) {
+function addElement(type, extraOpts = null) {
   if (draft.elements.length >= MAX_ELEMENTS) return;
   const isClock = type === "clock";
   const data = {
@@ -284,6 +302,7 @@ function addElement(type) {
     opts: isClock ? { ...store.get().clock } : (TYPE_DEFAULTS[type]?.() || {}),
   };
   if (type === "temperature") data.opts = { condition: true, icon: true };
+  if (extraOpts) data.opts = { ...data.opts, ...extraOpts };
   draft.elements.push(data);
   mount(true);
   select(data.id);
@@ -447,7 +466,10 @@ function bindUi() {
 
   ui.addEventListener("click", (e) => { if (handleSelectTap(e)) e.stopPropagation(); }, true);
   ui.addEventListener("click", onClick);
-  ui.addEventListener("input", (e) => onField(e.target, true));
+  ui.addEventListener("input", (e) => {
+    if (e.target.dataset.ea === "search") { addQuery = e.target.value; renderAddList(); return; }
+    onField(e.target, true);
+  });
   ui.addEventListener("change", (e) => onField(e.target, false));
   ui.addEventListener("mousedown", (e) => { if (e.target.closest(".chip")) e.preventDefault(); });
 }
@@ -462,6 +484,10 @@ function renderToolbar() {
 
 function label(type) {
   return type === "clock" ? t("comp.clock") : t("comp." + type);
+}
+/** Nome de um elemento já criado (informação do sistema usa o nome da informação). */
+function labelFor(data) {
+  return data.type === "system" ? sysinfo.label(data.opts?.key || "version") : label(data.type);
 }
 
 function selectRow(field, labelText, options, value) {
@@ -492,7 +518,7 @@ function renderPanel() {
   const o = data.opts || {};
   let html = `
     <div class="ep-head">
-      <span class="ep-title">${esc(label(data.type))}</span>
+      <span class="ep-title">${esc(labelFor(data))}</span>
       <span class="ep-actions">
         <button type="button" class="ep-icon" data-ed="front" aria-label="${esc(t("edit.front"))}" title="${esc(t("edit.front"))}">${ICON_FRONT}</button>
         <button type="button" class="ep-icon" data-ed="duplicate" aria-label="${esc(t("edit.duplicate"))}" title="${esc(t("edit.duplicate"))}">${ICON_COPY}</button>
@@ -565,6 +591,10 @@ function renderPanel() {
         html += toggleRow("opts.condition", t("temp.condition"), o.condition !== false);
         for (const k of WEATHER_EXTRAS) html += toggleRow("opts." + k, t("wxopt." + k), !!o[k]);
         break;
+      case "system":
+        html += selectRow("opts.key", t("comp.system"), sysinfo.SYS_KEYS.map((k) => ({ value: k, label: sysinfo.label(k) })), o.key || "version");
+        html += toggleRow("opts.showLabel", t("sys.showLabel"), !!o.showLabel);
+        break;
       case "sun":
         if (typeof store.get().location?.lat !== "number") html += `<div class="ep-row"><span class="row-hint warn">${t("comp.needsLocation")}</span></div>`;
         break;
@@ -585,14 +615,56 @@ function openAddSheet() {
   addSheet.hidden = false;
   addSheet.innerHTML = `
     <div class="ea-card" role="dialog" aria-label="${esc(t("edit.add"))}">
-      <div class="ea-title">${t("edit.addTitle")}</div>
-      <div class="ea-grid">
-        ${ELEMENT_TYPES.map((ty) => `<button type="button" data-ed="add-type" data-value="${ty}">${esc(label(ty))}</button>`).join("")}
+      <div class="ea-head">
+        <div class="ea-title">${t("edit.addTitle")}</div>
+        <button type="button" class="ep-icon" data-ed="add-close" aria-label="${esc(t("edit.cancel"))}">✕</button>
       </div>
-      <button type="button" class="tb-btn" data-ed="add-close">${t("edit.cancel")}</button>
+      <input type="search" class="field-input ea-search" id="ea-search" data-ea="search" placeholder="${esc(t("edit.search"))}" value="${esc(addQuery)}" autocomplete="off" enterkeyhint="search">
+      <div class="ea-cats" role="tablist">
+        ${CATEGORIES.map((c) => `<button type="button" role="tab" class="ea-cat" data-ed="add-cat" data-value="${c}" aria-selected="${c === addCat}">${esc(t("cat." + c))}</button>`).join("")}
+      </div>
+      <div class="ea-list" role="list"></div>
     </div>`;
-  addSheet.querySelector("button")?.focus();
+  renderAddList();
 }
+
+/** Prévia do valor atual de um item do catálogo (texto curto). */
+function previewOf(item) {
+  if (item.type === "system") return sysinfo.value(item.opts.key);
+  if (item.type === "clock") {
+    const d = new Date();
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  }
+  try {
+    const comp = createSlotComponent({ type: item.type, ...(TYPE_DEFAULTS[item.type]?.() || {}) });
+    if (!comp) return "";
+    const box = document.createElement("div");
+    comp.mount(box);
+    comp.update(new Date());
+    const txt = box.textContent.replace(/\s+/g, " ").trim();
+    comp.destroy?.();
+    return txt;
+  } catch { return ""; }
+}
+
+function renderAddList() {
+  const listEl = addSheet.querySelector(".ea-list");
+  if (!listEl) return;
+  const q = fold(addQuery.trim());
+  // com busca, procura em todas as categorias
+  const items = catalog().filter((it) => (q ? true : addCat === "all" || it.cat === addCat))
+    .filter((it) => !q || fold(`${it.name} ${t("cat." + it.cat)} ${it.type} ${it.opts?.key || ""}`).includes(q));
+  addSheet.querySelectorAll(".ea-cat").forEach((b) => b.setAttribute("aria-selected", String(!q && b.dataset.value === addCat)));
+  listEl.innerHTML = items.length ? items.map((it) => {
+    const pv = previewOf(it);
+    return `<button type="button" role="listitem" class="ea-item" data-ed="add-type" data-value="${it.type}" data-key="${it.opts?.key || ""}">
+      <span class="ea-name">${esc(it.name)}</span>
+      ${pv ? `<span class="ea-prev">${esc(pv.length > 42 ? pv.slice(0, 41) + "…" : pv)}</span>` : ""}
+      <span class="ea-cat-tag">${esc(t("cat." + it.cat))}</span>
+    </button>`;
+  }).join("") : `<div class="ea-empty">${esc(t("edit.noResults"))}</div>`;
+}
+
 function closeAddSheet() { if (addSheet) { addSheet.hidden = true; addSheet.innerHTML = ""; } }
 
 function onClick(e) {
@@ -605,7 +677,13 @@ function onClick(e) {
   switch (b.dataset.ed) {
     case "add": openAddSheet(); break;
     case "add-close": closeAddSheet(); break;
-    case "add-type": closeAddSheet(); addElement(v); break;
+    case "add-type": closeAddSheet(); addElement(v, b.dataset.key ? { key: b.dataset.key } : null); break;
+    case "add-cat":
+      addCat = v; addQuery = "";
+      try { localStorage.setItem("nada-clock:addCat", v); } catch { /* ok */ }
+      { const inp = addSheet.querySelector(".ea-search"); if (inp) inp.value = ""; }
+      renderAddList();
+      break;
     case "reset":
       if (!resetArmed) { resetArmed = true; renderToolbar(); setTimeout(() => { resetArmed = false; if (editing) renderToolbar(); }, 3500); }
       else { resetArmed = false; resetLayout(); renderToolbar(); }

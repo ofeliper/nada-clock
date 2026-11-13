@@ -28,6 +28,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 
   <link rel="stylesheet" href="css/style.css">
+  <script>try{if(sessionStorage.getItem("nada-clock:updated")==="1")document.documentElement.classList.add("veil-boot")}catch(e){}</script>
 </head>
 <body>
   <noscript>
@@ -135,7 +136,9 @@
   </div>
 
   <!-- Aviso de nova versão -->
-  <button id="update-toast" class="toast" type="button" hidden></button>
+  <div id="update-toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <!-- Véu da atualização: escurece antes de recarregar e clareia na volta -->
+  <div id="reload-veil" class="reload-veil" hidden><span class="veil-text"></span></div>
 
   <!-- Seletor próprio (substitui a "roleta" nativa, que não gira com o app) -->
   <div id="picker" class="picker" hidden>

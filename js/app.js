@@ -14,6 +14,8 @@ import { initPicker, openPicker } from "./picker.js";
 import * as share from "./share.js";
 import * as free from "./free.js";
 import * as radial from "./radial.js";
+import * as awake from "./awake.js";
+import * as sysinfo from "./sysinfo.js";
 
 const $ = (id) => document.getElementById(id);
 const stage = $("stage");
@@ -137,25 +139,8 @@ function showBrightnessIndicator(v) {
   indicatorTimer = setTimeout(() => ind.classList.remove("visible"), 900);
 }
 
-// ---------------- Tela sempre ligada (Wake Lock) ----------------
-let wakeLock = null;
-let wakeLockState = "wakeLock" in navigator ? "off" : "unsupported";
-
-async function requestWakeLock() {
-  if (!("wakeLock" in navigator) || wakeLock || document.visibilityState !== "visible") return;
-  try {
-    wakeLock = await navigator.wakeLock.request("screen");
-    wakeLockState = "on";
-    wakeLock.addEventListener("release", () => {
-      wakeLock = null;
-      wakeLockState = "off";
-      settings.refresh();
-    });
-  } catch {
-    wakeLockState = "off"; // ex.: exige um toque do usuário antes; tentamos de novo no próximo toque
-  }
-  settings.refresh();
-}
+// ---------------- Tela sempre ligada (js/awake.js) ----------------
+const requestWakeLock = () => awake.ensure();
 
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") {
@@ -636,18 +621,45 @@ pomodoro.mount($("pomodoro-view"));
 applyClockType();
 applyTab();
 updateTabDots();
-settings.initSettings({ onClose: () => tick(), wakeLockState: () => wakeLockState, editScreen: startEditing });
+settings.initSettings({ onClose: () => tick(), wakeLockState: () => awake.getState(), editScreen: startEditing });
 weather.init();
 applyBurnIn();
 loop();
-requestWakeLock();
+awake.init({ changed: () => settings.refresh() });
 
 // mostra os controles por alguns segundos na primeira abertura
 showUI();
 window.__nadaReady = true;
 
 // Service worker: offline, instalação na Tela de Início e atualizações
-update.init();
+sysinfo.noteVersion(settings.VERSION);
+sysinfo.provide({
+  version: () => settings.VERSION,
+  face: () => t("mode." + store.currentMode()),
+  clock: () => {
+    const s = store.get();
+    const c = s.face === "interactive" ? s.interactive?.elements?.find((e) => e.type === "clock")?.opts : s.clock;
+    if (!c) return t("sys.none");
+    if (c.type === "analog") return t("center.analog");
+    return `${t("center.digital")} · ${c.hour12 ? "12h" : "24h"}`;
+  },
+  brightness: () => Math.round((store.get().brightness ?? 1) * 100) + "%",
+  night: () => {
+    const s = store.get();
+    const o = nightOverride();
+    if (o) return t(o.mode === "on" ? "sys.nightOnUntil" : "sys.nightOffUntil", { time: formatShortTime(new Date(o.until)) });
+    if (!s.nightEnabled) return t("sys.nightDisabled");
+    return nightNow()
+      ? t("sys.nightOnUntil", { time: formatShortTime(nextAt(s.nightEnd)) })
+      : t("sys.nightScheduled", { start: s.nightStart, end: s.nightEnd });
+  },
+  awake: () => {
+    const st = awake.getState();
+    return t(st === "on" ? "sys.awakeOn" : st === "video" ? "sys.awakeVideo" : "sys.awakeOff");
+  },
+  orientation: () => t(rotation !== "none" ? "sys.orientRotated" : innerHeight > innerWidth ? "sys.orientPortrait" : "sys.orientLandscape"),
+});
+update.init({ version: settings.VERSION });
 
 // Layout compartilhado por link (#p=...)
 function checkSharedLink() {

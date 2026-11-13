@@ -3,6 +3,7 @@
 import * as store from "./store.js";
 import { formatDate, formatWeekday, getLanguage, LANGUAGES, t } from "./i18n.js";
 import { formatTemp, conditionKey } from "./weather.js";
+import { SYS_KEYS, value as sysValue } from "./sysinfo.js";
 
 const pad = (n) => String(n).padStart(2, "0");
 
@@ -68,6 +69,7 @@ export const TOKENS = [
   "HH", "hh", "mm", "ss", "ampm",
   "weekday", "wd", "day", "month", "monthName", "mon", "year", "date",
   "temp", "weather", "feels", "tmax", "tmin", "humidity", "rain",
+  ...SYS_KEYS,
 ];
 
 function value(token, now) {
@@ -94,7 +96,7 @@ function value(token, now) {
     case "tmin": { const w = weatherData(); return w?.tminC == null ? "" : deg(w.tminC); }
     case "humidity": { const w = weatherData(); return w?.humidity == null ? "" : `${Math.round(w.humidity)}%`; }
     case "rain": { const w = weatherData(); return w?.rainProb == null ? "" : `${Math.round(w.rainProb)}%`; }
-    default: return null;
+    default: return SYS_KEYS.includes(token) ? sysValue(token) : null;
   }
 }
 

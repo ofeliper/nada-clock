@@ -15,7 +15,7 @@ import * as share from "./share.js";
 
 const REPO = "https://github.com/ofeliper/nada-clock";
 
-export const VERSION = "0.8.3";
+export const VERSION = "0.9.0";
 
 const DATE_FORMATS = ["auto", "dmy", "mdy", "ymd", "short", "long"];
 const SEPARATORS = ["/", "-", "."];
@@ -181,7 +181,7 @@ function render() {
       ${switchRow("mirror", t("general.mirror"), s.mirror, t("general.mirrorHint"))}
       <div class="row">
         <span class="row-label">${t("general.wakeLock")}
-          <span class="row-hint ${getWakeLockState() === "on" ? "" : "warn"}">${wakeLockText()}</span>
+          <span class="row-hint ${getWakeLockState() === "off" ? "warn" : ""}">${wakeLockText()}</span>
         </span>
       </div>
       <div class="row">
@@ -596,6 +596,7 @@ function soundsSection(s) {
 function wakeLockText() {
   const st = getWakeLockState();
   if (st === "on") return t("general.wakeLockOn");
+  if (st === "video") return t("general.wakeLockVideo");
   if (st === "unsupported") return t("general.wakeLockUnsupported");
   return t("general.wakeLockOff");
 }
