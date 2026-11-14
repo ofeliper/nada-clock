@@ -9,7 +9,7 @@ import html, json, pathlib
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 BASE = "https://ofeliper.github.io/nada-clock/"
 REPO = "https://github.com/ofeliper/nada-clock"
-VERSION = "0.9.0"
+VERSION = "0.10.0"
 
 PAGES = {
     "pt": {"dir": "sobre", "lang": "pt-BR", "og_locale": "pt_BR", "label": "Português"},

@@ -441,5 +441,22 @@ export default {
   "sys.awakeOff": "Inactiva",
   "sys.orientPortrait": "Vertical",
   "sys.orientLandscape": "Horizontal",
-  "sys.orientRotated": "Girada"
+  "sys.orientRotated": "Girada",
+  "ts.title": "Editar texto",
+  "cat.date": "Fecha",
+  "edit.asText": "Texto",
+  "edit.noText": "El reloj analógico no se puede convertir en texto.",
+  "edit.customized": "Personalizado (ahora es un texto)",
+  "edit.revert": "Volver al original",
+  "edit.convertNote": "Al cambiar el texto, este elemento se convierte en un Texto libre (puedes volver al original).",
+  "edit.loses": "Deja de tener: {what}.",
+  "edit.lose.clock": "flip, LED y parpadeo de los dos puntos",
+  "edit.lose.wxicon": "icono del clima",
+  "edit.lose.bar": "barra de progreso",
+  "edit.lose.moonicon": "dibujo de la luna",
+  "radial.weather": "Actualizar clima",
+  "wxr.done": "Clima actualizado a las {time}",
+  "wxr.noLocation": "Define la ubicación en los ajustes",
+  "wxr.failedKept": "Sin conexión — se mantiene el de las {time}",
+  "wxr.failed": "No se pudo obtener el clima ahora"
 };

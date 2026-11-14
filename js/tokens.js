@@ -4,6 +4,7 @@ import * as store from "./store.js";
 import { formatDate, formatWeekday, getLanguage, LANGUAGES, t } from "./i18n.js";
 import { formatTemp, conditionKey } from "./weather.js";
 import { SYS_KEYS, value as sysValue } from "./sysinfo.js";
+import { phaseName, moonPhase, sunTimes, progressRatio, countdownText, zoneCity } from "./components.js";
 
 const pad = (n) => String(n).padStart(2, "0");
 
@@ -64,15 +65,23 @@ export function weatherExtra(kind) {
   }
 }
 
-/** Lista exibida no editor (ordem = ordem dos botões). */
-export const TOKENS = [
-  "HH", "hh", "mm", "ss", "ampm",
-  "weekday", "wd", "day", "month", "monthName", "mon", "year", "date",
-  "temp", "weather", "feels", "tmax", "tmin", "humidity", "rain",
-  ...SYS_KEYS,
-];
+/** Variáveis por grupo (ordem = ordem dos botões no editor de texto). */
+export const TOKEN_GROUPS = {
+  time: ["HH", "hh", "mm", "ss", "ampm", "tzTime", "tzCity"],
+  date: ["weekday", "wd", "day", "month", "monthName", "mon", "year", "date"],
+  weather: ["temp", "weather", "feels", "tmax", "tmin", "humidity", "rain", "wind"],
+  sky: ["moon", "sunrise", "sunset"],
+  count: ["dayPct", "weekPct", "monthPct", "yearPct", "countdown"],
+  system: SYS_KEYS,
+};
+export const TOKENS = Object.values(TOKEN_GROUPS).flat();
 
-function value(token, now) {
+function hhmm(d) {
+  const h12 = !!store.get().clock.hour12;
+  return d.toLocaleTimeString(h12 ? "en-US" : "pt-BR", { hour: "2-digit", minute: "2-digit", hour12: h12 });
+}
+
+function value(token, now, ctx = {}) {
   const s = store.get();
   const lang = getLanguage();
   switch (token) {
@@ -96,14 +105,33 @@ function value(token, now) {
     case "tmin": { const w = weatherData(); return w?.tminC == null ? "" : deg(w.tminC); }
     case "humidity": { const w = weatherData(); return w?.humidity == null ? "" : `${Math.round(w.humidity)}%`; }
     case "rain": { const w = weatherData(); return w?.rainProb == null ? "" : `${Math.round(w.rainProb)}%`; }
+    case "wind": return weatherExtra("wind");
+    case "moon": return phaseName(moonPhase(now));
+    case "sunrise": case "sunset": {
+      const loc = s.location;
+      if (typeof loc?.lat !== "number") return "";
+      const st = sunTimes(now, loc.lat, loc.lon);
+      if (st.polar) return t(st.polar === "day" ? "sun.polarDay" : "sun.polarNight");
+      return hhmm(token === "sunrise" ? st.rise : st.set);
+    }
+    case "dayPct": case "weekPct": case "monthPct": case "yearPct":
+      return Math.floor(progressRatio(token.replace("Pct", ""), now) * 100) + "%";
+    case "countdown": return countdownText(ctx.date, now);
+    case "tzTime": {
+      try {
+        const h12 = !!s.clock.hour12;
+        return new Intl.DateTimeFormat("en-GB", { timeZone: ctx.zone || "Europe/Lisbon", hour: "2-digit", minute: "2-digit", hour12: h12 }).format(now).toUpperCase();
+      } catch { return ""; }
+    }
+    case "tzCity": return ctx.label?.trim() || zoneCity(ctx.zone || "Europe/Lisbon");
     default: return SYS_KEYS.includes(token) ? sysValue(token) : null;
   }
 }
 
 /** "Bom dia, {weekday}!" → "Bom dia, domingo!" (tokens desconhecidos ficam como estão). */
-export function expand(template, now = new Date()) {
+export function expand(template, now = new Date(), ctx = {}) {
   return String(template || "").replace(/\{(\w+)\}/g, (m, tok) => {
-    const v = value(tok, now);
+    const v = value(tok, now, ctx);
     return v == null ? m : v;
   });
 }

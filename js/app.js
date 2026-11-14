@@ -16,6 +16,7 @@ import * as free from "./free.js";
 import * as radial from "./radial.js";
 import * as awake from "./awake.js";
 import * as sysinfo from "./sysinfo.js";
+import * as texteditor from "./texteditor.js";
 
 const $ = (id) => document.getElementById(id);
 const stage = $("stage");
@@ -390,7 +391,7 @@ function startHoldEdit(g, el, e) {
       try { navigator.vibrate?.(12); } catch { /* ok */ }
       hideUI();
       radial.openAt(g.lastX ?? e.clientX, g.lastY ?? e.clientY, {
-        target: el ? { id: el.dataset.id, label: el.dataset.placeholder || "" } : null,
+        target: el ? { id: el.dataset.id, label: el.dataset.placeholder || "", type: el.dataset.type } : null,
       });
     }, HOLD_EDIT_DELAY + HOLD_EDIT_MS),
   ];
@@ -489,6 +490,36 @@ function applyBurnIn() {
 }
 setInterval(applyBurnIn, BURN_IN_MS);
 
+// ---------------- Aviso curto e atualizar clima ----------------
+let noticeTimer = null;
+function notify(text, ms = 2800) {
+  const el = $("notice");
+  if (!el) return;
+  el.textContent = text;
+  el.classList.add("visible");
+  clearTimeout(noticeTimer);
+  noticeTimer = setTimeout(() => el.classList.remove("visible"), ms);
+}
+
+/** Busca a temperatura agora (menu circular), com a temperatura piscando e um aviso no fim. */
+async function refreshWeather() {
+  const html = document.documentElement;
+  if (html.classList.contains("wx-loading")) return;
+  html.classList.add("wx-loading");
+  const started = performance.now();
+  try { await weather.refreshNow(); } catch { /* ok */ }
+  // pisca pelo menos um instante, para dar para ver que algo aconteceu
+  const wait = Math.max(0, 600 - (performance.now() - started));
+  await new Promise((r) => setTimeout(r, wait));
+  html.classList.remove("wx-loading");
+  const st = weather.getStatus();
+  const at = store.getWeatherCache()?.updatedAt;
+  const time = at ? formatShortTime(new Date(at)) : "";
+  if (st === "ok") notify(t("wxr.done", { time }));
+  else if (st === "nolocation") notify(t("wxr.noLocation"));
+  else notify(time ? t("wxr.failedKept", { time }) : t("wxr.failed"));
+}
+
 // ---------------- Mostrador Interativo ----------------
 function applyFace() {
   const s = store.get();
@@ -567,6 +598,7 @@ applyOrientation();
 applyBrightness(store.get().brightness);
 mountFace(grid, true);
 initPicker();
+texteditor.init();
 free.init({
   // movimento do dedo → coordenadas do app (com y para baixo)
   mapPointerDelta: (dx, dy) => { const d = toAppDelta(dx, dy); return { dx: d.dx, dy: -d.dy }; },
@@ -582,6 +614,7 @@ radial.init({
     const o = nightOverride();
     return {
       interactive: s.face === "interactive",
+      tempEnabled: !!s.tempEnabled,
       mode: store.currentMode(),
       tab: s.tab,
       night: o ? o.mode : "auto",
@@ -604,6 +637,7 @@ radial.init({
       case "lock": setLocked(true); break;
       case "rotate": toggleRotation(); break;
       case "settings": settings.open(); break;
+      case "weather": refreshWeather(); break;
     }
   },
 });

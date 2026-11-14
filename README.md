@@ -4,7 +4,7 @@
 
 Funciona como um app instalado na Tela de Início (PWA): tela cheia, tela sempre ligada, funciona offline.
 
-## Funcionalidades (v0.9.0)
+## Funcionalidades (v0.10.0)
 
 - Quatro abas: **Relógio**, **Timer**, **Cronômetro** e **Pomodoro** — troque pela barra do topo (aparece com um toque) ou deslizando para o lado
 - **Timer**: vários ao mesmo tempo, com nome (ex.: "macarrão", "forno")
@@ -20,6 +20,7 @@ Funciona como um app instalado na Tela de Início (PWA): tela cheia, tela sempre
   - No modo rápido, pare um instante sobre uma opção com › e o submenu abre ali mesmo, sem soltar
   - Editar item (só no Interativo), Mostradores ›, Ferramentas › (Relógio, Timer, Cronômetro, Pomodoro), Brilho › (anel de girar), Noturno › (Programado, Ligado agora, Desligado agora), Bloquear, Girar, Ajustes
   - "Ligado agora" vale até o fim do horário noturno; "Desligado agora", até o próximo início
+  - **Atualizar clima** (com a temperatura ligada); segurando em cima da temperatura, ele vem no topo
 - Mostrador **Minimalista** (digital ou analógico): relógio + dia e data (acima ou abaixo, coladinhos no relógio)
 - Mostrador **Customizado**: 11 posições (bordas de cima e de baixo, logo acima/abaixo do relógio e laterais)
   - Arraste uma posição sobre outra para trocar — inclusive o relógio, que pode ir para qualquer lugar
@@ -36,6 +37,9 @@ Funciona como um app instalado na Tela de Início (PWA): tela cheia, tela sempre
   - Duplicar, trazer para a frente, remover; setas do teclado movem, Delete remove
   - **Adicionar elemento** com busca pelo nome e categorias (Todas, Relógio e data, Clima, Astronomia, Contagens, Texto, Sistema), mostrando o valor atual de cada item
   - **Sistema**: versão do app, data da atualização, mostrador, tipo de relógio, brilho, modo noturno, tela sempre acesa, conexão, idioma, fuso, localização, hora do clima e orientação (também como variáveis do Texto, ex.: `{version}`, `{brightness}`)
+  - **Todo elemento vira texto**: o campo Texto mostra o que o elemento exibe escrito com variáveis; editar transforma em Texto livre (com "Voltar ao original")
+  - Variáveis novas: `{moon}`, `{sunrise}`, `{sunset}`, `{dayPct}`…`{yearPct}`, `{countdown}`, `{tzTime}`, `{tzCity}`, `{wind}`
+  - **Editor de texto "em pé"**: com o app girado, campos de texto, data e cor abrem numa tela na orientação do teclado, com botões de variáveis e prévia
   - Layouts separados para a tela deitada e em pé; **Padrão** volta ao layout inicial
 - 7 paletas: **Sistema** (padrão; segue o modo claro/escuro do aparelho), Terminal, Âmbar, Neve, Gelo, Noturno e Papel (clara)
 - **Restaurar padrão** nas configurações
@@ -101,6 +105,7 @@ js/free.js              mostrador Interativo: elementos livres e editor na tela
 js/radial.js            menu circular (segurar a tela)
 js/awake.js             tela sempre acesa (Wake Lock + vídeo mudo de reserva)
 js/sysinfo.js           informações do sistema para pôr na tela
+js/texteditor.js        editor de texto "em pé" (fora do app girado)
 js/components.js        componentes (relógios, data, fuso, progresso, lua, contagem, texto)
 js/tokens.js            placeholders do texto livre
 js/themes.js            paletas e modo Sistema

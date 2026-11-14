@@ -462,5 +462,22 @@ export default {
   "sys.awakeOff": "Inativa",
   "sys.orientPortrait": "Em pé",
   "sys.orientLandscape": "Deitado",
-  "sys.orientRotated": "Girado"
+  "sys.orientRotated": "Girado",
+  "ts.title": "Editar texto",
+  "cat.date": "Data",
+  "edit.asText": "Texto",
+  "edit.noText": "O relógio analógico não vira texto.",
+  "edit.customized": "Personalizado (agora é um texto)",
+  "edit.revert": "Voltar ao original",
+  "edit.convertNote": "Ao mudar o texto, este elemento vira um Texto livre (dá para voltar ao original).",
+  "edit.loses": "Deixa de ter: {what}.",
+  "edit.lose.clock": "flip, LED e piscar dos dois-pontos",
+  "edit.lose.wxicon": "ícone do clima",
+  "edit.lose.bar": "barra de progresso",
+  "edit.lose.moonicon": "desenho da lua",
+  "radial.weather": "Atualizar clima",
+  "wxr.done": "Clima atualizado às {time}",
+  "wxr.noLocation": "Defina a localização nas configurações",
+  "wxr.failedKept": "Sem conexão — mantido o de {time}",
+  "wxr.failed": "Não deu para buscar o clima agora"
 };

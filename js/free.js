@@ -9,9 +9,10 @@
 import * as store from "./store.js";
 import { t } from "./i18n.js";
 import { createClock, createSlotComponent, SLOT_TYPES, ZONES, zoneCity, WEATHER_EXTRAS } from "./components.js";
-import { TOKENS, expand } from "./tokens.js";
+import { expand } from "./tokens.js";
 import { enhanceSelects, handleSelectTap } from "./picker.js";
 import * as sysinfo from "./sysinfo.js";
+import * as texteditor from "./texteditor.js";
 
 export const ELEMENT_TYPES = ["clock", ...SLOT_TYPES.filter((x) => x !== "empty")];
 
@@ -526,6 +527,7 @@ function renderPanel() {
       </span>
     </div>
     <div class="ep-body">`;
+  html += textFieldRow(data);
 
   html += `<div class="ep-row ep-size"><span class="ep-label">${t("edit.size")}</span>
       <span class="ep-stepper">
@@ -579,12 +581,18 @@ function renderPanel() {
         html += `<div class="ep-row"><span class="ep-label">${t("countdown.date")}</span><input type="date" data-f="opts.date" value="${esc(o.date || "")}"></div>`;
         html += textRow("opts.label", t("countdown.label"), o.label || "", t("countdown.labelPlaceholder"));
         break;
-      case "text":
-        html += textRow("opts.text", t("text.template"), o.text || "", t("text.placeholder"));
-        html += `<div class="ep-row ep-stack"><span class="ep-label">${t("text.tokens")}</span>
-          <div class="chips">${TOKENS.map((tk) => `<button type="button" class="chip" data-ed="token" data-value="{${tk}}">{${tk}}</button>`).join("")}</div>
-          <span class="preview">${t("text.preview")} <b data-preview>${esc(expand(o.text || ""))}</b></span></div>`;
+      case "text": {
+        // opções que as variáveis do texto usam (fuso, data da contagem)
+        const tx = o.text || "";
+        if (/\{tz(Time|City)\}/.test(tx)) {
+          html += selectRow("opts.zone", t("tz.zone"), ZONES.map((z) => ({ value: z, label: zoneCity(z) })), o.zone || "Europe/Lisbon");
+          if (/\{tzCity\}/.test(tx)) html += textRow("opts.label", t("tz.label"), o.label || "", t("tz.labelPlaceholder"));
+        }
+        if (/\{countdown\}/.test(tx)) {
+          html += `<div class="ep-row"><span class="ep-label">${t("countdown.date")}</span><input type="date" data-f="opts.date" value="${esc(o.date || "")}"></div>`;
+        }
         break;
+      }
       case "temperature":
         if (!store.get().tempEnabled) html += `<div class="ep-row"><span class="row-hint warn">${t("comp.tempOff")}</span></div>`;
         html += toggleRow("opts.icon", t("temp.icon"), o.icon !== false);
@@ -603,6 +611,102 @@ function renderPanel() {
   html += "</div>";
   panel.innerHTML = html;
   enhanceSelects(panel);
+}
+
+// ---------------- Elemento como texto ----------------
+
+/** O que o elemento mostra, escrito com variáveis. null = não dá para virar texto (analógico). */
+function toTemplate(data) {
+  const o = data.opts || {};
+  switch (data.type) {
+    case "text": return { text: o.text || "", loses: [] };
+    case "clock": {
+      if (o.type === "analog") return null;
+      const sec = o.seconds !== false ? ":{ss}" : "";
+      return { text: o.hour12 ? `{hh}:{mm}${sec} {ampm}` : `{HH}:{mm}${sec}`, loses: ["clock"] };
+    }
+    case "weekdayDate": return { text: "{wd} · {date}", loses: [] };
+    case "weekday": return { text: "{weekday}", loses: [] };
+    case "date": return { text: "{date}", loses: [] };
+    case "temperature": {
+      let txt = o.condition !== false ? "{temp} {weather}" : "{temp}";
+      const ex = {
+        feels: t("wx.feels", { v: "{feels}" }),
+        minmax: t("wx.minmax", { max: "{tmax}", min: "{tmin}" }),
+        humidity: t("wx.humidity", { v: "{humidity}" }).replace("}%", "}"),
+        rain: t("wx.rain", { v: "{rain}" }).replace("}%", "}"),
+        wind: "{wind}",
+      };
+      for (const k of WEATHER_EXTRAS) if (o[k]) txt += " · " + ex[k];
+      return { text: txt, loses: o.icon !== false ? ["wxicon"] : [] };
+    }
+    case "timezone": return { text: "{tzCity} {tzTime}", loses: [] };
+    case "progress": { const m = o.mode || "day"; return { text: `${t("progress." + m)} {${m}Pct}`, loses: ["bar"] }; }
+    case "moon": return { text: "{moon}", loses: ["moonicon"] };
+    case "sun": return { text: "↑ {sunrise} · ↓ {sunset}", loses: [] };
+    case "countdown": return { text: o.label?.trim() ? `{countdown} · ${o.label.trim()}` : "{countdown}", loses: [] };
+    case "system": {
+      const key = o.key || "version";
+      return { text: o.showLabel ? `${sysinfo.label(key)}: {${key}}` : `{${key}}`, loses: [] };
+    }
+    default: return { text: "", loses: [] };
+  }
+}
+
+function textFieldRow(data) {
+  const tpl = toTemplate(data);
+  if (!tpl) return `<div class="ep-row"><span class="row-hint">${esc(t("edit.noText"))}</span></div>`;
+  const pv = expand(tpl.text, new Date(), data.opts || {});
+  let h = `<div class="ep-row ep-stack"><span class="ep-label">${esc(t("edit.asText"))}</span>
+    <button type="button" class="ep-textbtn" data-ed="edit-text"><code>${esc(tpl.text) || "&nbsp;"}</code><span class="pv">${esc(pv)}</span></button>`;
+  if (data.from) h += `<div class="ep-custom"><span>${esc(t("edit.customized"))}</span><button type="button" class="btn-mini" data-ed="revert">${esc(t("edit.revert"))}</button></div>`;
+  return h + "</div>";
+}
+
+function openElementText(id) {
+  const data = findEl(id);
+  const tpl = data && toTemplate(data);
+  if (!tpl) return;
+  const font = data.font || (FONTS.includes(data.opts?.font) ? data.opts.font : "rounded");
+  let note = "";
+  if (data.type !== "text") {
+    note = t("edit.convertNote");
+    if (tpl.loses.length) note += " " + t("edit.loses", { what: tpl.loses.map((k) => t("edit.lose." + k)).join(", ") });
+  }
+  texteditor.open({
+    kind: "text",
+    title: labelFor(data),
+    value: tpl.text,
+    tokens: true,
+    multiline: true,
+    placeholder: t("text.placeholder"),
+    preview: (v) => expand(v, new Date(), findEl(id)?.opts || {}),
+    previewStyle: { color: data.color, font },
+    note,
+    onDone: (v) => {
+      const d = findEl(id);
+      if (!d) return;
+      if (d.type === "text") { d.opts = { ...(d.opts || {}), text: v }; mount(true); renderPanel(); return; }
+      // vira Texto livre, guardando o original para "Voltar ao original"
+      d.from = { type: d.type, opts: clone(d.opts || {}), font: d.font };
+      d.type = "text";
+      d.font = font;
+      d.opts = { ...(d.opts || {}), text: v };
+      mount(true);
+      renderPanel();
+    },
+  });
+}
+
+function revertElement(id) {
+  const d = findEl(id);
+  if (!d?.from) return;
+  d.type = d.from.type;
+  d.opts = d.from.opts;
+  d.font = d.from.font;
+  delete d.from;
+  mount(true);
+  renderPanel();
 }
 
 function syncSizeInput() {
@@ -703,6 +807,8 @@ function onClick(e) {
     case "color": changed(selectedId, { color: v || null }, { panel: true }); break;
     case "align": changed(selectedId, { align: v }, { panel: true }); break;
     case "clocktype": changeOpts(selectedId, { type: v }, { panel: true }); break;
+    case "edit-text": openElementText(selectedId); break;
+    case "revert": revertElement(selectedId); break;
     case "token": {
       const input = panel.querySelector('input[data-f="opts.text"]');
       if (!input) break;

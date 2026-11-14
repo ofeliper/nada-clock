@@ -462,5 +462,22 @@ export default {
   "sys.awakeOff": "Off",
   "sys.orientPortrait": "Portrait",
   "sys.orientLandscape": "Landscape",
-  "sys.orientRotated": "Rotated"
+  "sys.orientRotated": "Rotated",
+  "ts.title": "Edit text",
+  "cat.date": "Date",
+  "edit.asText": "Text",
+  "edit.noText": "The analog clock can't become text.",
+  "edit.customized": "Customized (now a text)",
+  "edit.revert": "Back to original",
+  "edit.convertNote": "Changing the text turns this element into a free Text (you can go back to the original).",
+  "edit.loses": "It loses: {what}.",
+  "edit.lose.clock": "flip, LED and blinking colon",
+  "edit.lose.wxicon": "weather icon",
+  "edit.lose.bar": "progress bar",
+  "edit.lose.moonicon": "moon drawing",
+  "radial.weather": "Update weather",
+  "wxr.done": "Weather updated at {time}",
+  "wxr.noLocation": "Set the location in settings",
+  "wxr.failedKept": "No connection — kept the one from {time}",
+  "wxr.failed": "Couldn't get the weather right now"
 };

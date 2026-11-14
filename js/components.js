@@ -229,8 +229,9 @@ function iconFor(enabled) {
   return w ? conditionIcon(w.code, w.isDay) : "";
 }
 
+// as variáveis podem usar as opções do próprio elemento (fuso, data da contagem…); "\n" quebra a linha
 export const freeText = (opts = {}, big = false) =>
-  textComponent((now) => esc(expand(opts.text || "", now)), { className: big ? "comp-text comp-text-big" : "comp-text" });
+  textComponent((now) => esc(expand(opts.text || "", now, opts)).replace(/\n/g, "<br>"), { className: big ? "comp-text comp-text-big" : "comp-text" });
 
 // ---------------- Segundo fuso horário ----------------
 export const ZONES = [
@@ -259,20 +260,23 @@ export function timezone(opts = {}) {
 }
 
 // ---------------- Progresso (dia / semana / mês / ano) ----------------
+/** Quanto já passou (0–1) do dia, semana, mês ou ano. */
+export function progressRatio(mode, now) {
+  const y = now.getFullYear(), mo = now.getMonth(), d = now.getDate();
+  let start, end;
+  if (mode === "year") { start = new Date(y, 0, 1); end = new Date(y + 1, 0, 1); }
+  else if (mode === "month") { start = new Date(y, mo, 1); end = new Date(y, mo + 1, 1); }
+  else if (mode === "week") {
+    const dow = (now.getDay() + 6) % 7; // segunda = 0
+    start = new Date(y, mo, d - dow); end = new Date(y, mo, d - dow + 7);
+  } else { start = new Date(y, mo, d); end = new Date(y, mo, d + 1); }
+  return (now - start) / (end - start);
+}
+
 export function progress(opts = {}) {
   const mode = opts.mode || "day";
   let fill, label, last = -1;
-  const ratio = (now) => {
-    const y = now.getFullYear(), mo = now.getMonth(), d = now.getDate();
-    let start, end;
-    if (mode === "year") { start = new Date(y, 0, 1); end = new Date(y + 1, 0, 1); }
-    else if (mode === "month") { start = new Date(y, mo, 1); end = new Date(y, mo + 1, 1); }
-    else if (mode === "week") {
-      const dow = (now.getDay() + 6) % 7; // segunda = 0
-      start = new Date(y, mo, d - dow); end = new Date(y, mo, d - dow + 7);
-    } else { start = new Date(y, mo, d); end = new Date(y, mo, d + 1); }
-    return (now - start) / (end - start);
-  };
+  const ratio = (now) => progressRatio(mode, now);
   return {
     mount(el) {
       el.innerHTML = `<div class="comp-progress"><span class="p-label"></span><span class="p-bar"><span class="p-fill"></span></span></div>`;
@@ -299,7 +303,7 @@ export function moonPhase(now) {
   return (((days % SYNODIC) + SYNODIC) % SYNODIC) / SYNODIC; // 0 = nova, 0.5 = cheia
 }
 
-function phaseName(p) {
+export function phaseName(p) {
   const idx = Math.round(p * 8) % 8;
   return t("moon." + ["new", "waxingCrescent", "firstQuarter", "waxingGibbous", "full", "waningGibbous", "lastQuarter", "waningCrescent"][idx]);
 }
@@ -344,18 +348,23 @@ export function moon(opts = {}) {
 }
 
 // ---------------- Contagem até uma data ----------------
+/** "12 dias", "hoje", "há 3 dias" até a data (AAAA-MM-DD). */
+export function countdownText(dateStr, now) {
+  if (!dateStr) return "";
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const target = new Date(y, m - 1, d);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diff = Math.round((target - today) / 86400000);
+  if (diff === 0) return t("countdown.today");
+  if (diff > 0) return t(diff === 1 ? "countdown.day" : "countdown.days", { n: diff });
+  return t("countdown.ago", { n: -diff });
+}
+
 export function countdown(opts = {}) {
   return textComponent((now) => {
-    if (!opts.date) return "";
-    const [y, m, d] = opts.date.split("-").map(Number);
-    const target = new Date(y, m - 1, d);
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const diff = Math.round((target - today) / 86400000);
+    const txt = countdownText(opts.date, now);
+    if (!txt) return "";
     const name = opts.label?.trim() ? esc(opts.label.trim()) : "";
-    let txt;
-    if (diff === 0) txt = t("countdown.today");
-    else if (diff > 0) txt = t(diff === 1 ? "countdown.day" : "countdown.days", { n: diff });
-    else txt = t("countdown.ago", { n: -diff });
     return name ? `${esc(txt)}<span class="dot">·</span>${name}` : esc(txt);
   });
 }

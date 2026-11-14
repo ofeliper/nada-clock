@@ -119,6 +119,7 @@
     <svg class="hold-ring" viewBox="0 0 64 64"><circle class="bg" cx="32" cy="32" r="28"/><circle class="fg" cx="32" cy="32" r="28"/></svg>
     <svg class="hold-ic" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="2.2" fill="currentColor"/><circle cx="12" cy="4.5" r="1.6"/><circle cx="12" cy="19.5" r="1.6"/><circle cx="4.5" cy="12" r="1.6"/><circle cx="19.5" cy="12" r="1.6"/><circle cx="6.7" cy="6.7" r="1.4"/><circle cx="17.3" cy="17.3" r="1.4"/><circle cx="6.7" cy="17.3" r="1.4"/><circle cx="17.3" cy="6.7" r="1.4"/></svg>
   </div>
+  <div id="notice" class="notice" role="status" aria-live="polite"></div>
   <!-- Menu circular (js/radial.js) -->
   <div id="radial" class="radial" role="menu" data-i18n-aria="radial.label" aria-label="Menu" hidden><svg></svg></div>
   <div id="lock-hint" class="lock-hint" role="status" aria-live="polite">
@@ -164,6 +165,20 @@
   </div><!-- /#app -->
 
   <!-- Aviso caso o app não carregue (ex.: aberto direto do disco, via file://) -->
+  <!-- Editor de texto "em pé" (fora do app girado; js/texteditor.js) -->
+  <div id="text-sheet" class="text-sheet" role="dialog" aria-modal="true" hidden>
+    <div class="ts-card">
+      <div class="ts-head">
+        <button type="button" class="ts-btn" data-ts="cancel" data-i18n="edit.cancel">Cancelar</button>
+        <span class="ts-title"></span>
+        <button type="button" class="ts-btn primary" data-ts="done" data-i18n="edit.done">Concluir</button>
+      </div>
+      <div class="ts-field"></div>
+      <div class="ts-preview" aria-live="polite"></div>
+      <div class="ts-chips"></div>
+    </div>
+  </div>
+
   <div id="boot-error" class="boot-error" hidden>
     <p lang="pt-BR"><strong>O NADA Clock não carregou.</strong><br>
       Se você abriu o arquivo direto da pasta (endereço começando com <code>file://</code>), o navegador bloqueia os scripts.

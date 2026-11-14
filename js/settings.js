@@ -15,7 +15,7 @@ import * as share from "./share.js";
 
 const REPO = "https://github.com/ofeliper/nada-clock";
 
-export const VERSION = "0.9.0";
+export const VERSION = "0.10.0";
 
 const DATE_FORMATS = ["auto", "dmy", "mdy", "ymd", "short", "long"];
 const SEPARATORS = ["/", "-", "."];
@@ -343,7 +343,7 @@ function textEditor(id, value, attr) {
   return `
     <div class="row row-stack">
       <span class="row-label">${t("text.template")}</span>
-      <input type="text" class="field-input" id="${id}" ${attr} value="${esc(value)}" placeholder="${esc(t("text.placeholder"))}" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <input type="text" class="field-input" id="${id}" ${attr} data-tokens value="${esc(value)}" placeholder="${esc(t("text.placeholder"))}" autocomplete="off" autocapitalize="off" spellcheck="false">
       <span class="row-hint">${t("text.tokens")}</span>
       <div class="chips">${TOKENS.map((tk) => `<button type="button" class="chip" data-action="token" data-target="${id}" data-value="{${tk}}">{${tk}}</button>`).join("")}</div>
       <span class="preview" data-preview="${id}">${t("text.preview")} <b>${esc(expand(value))}</b></span>

@@ -24,6 +24,7 @@ const ICONS = {
   rotate: '<rect x="7.5" y="3" width="9" height="15" rx="2"/><path d="M3 13.5a9 9 0 0 0 8 7.4"/><path d="M8.6 18.4l2.4 2.5-2.6 2.1"/>',
   settings: '<path fill="currentColor" stroke="none" d="M19.14 12.94a7.07 7.07 0 0 0 .05-.94 7.07 7.07 0 0 0-.05-.94l2.03-1.58a.49.49 0 0 0 .12-.62l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.03 7.03 0 0 0-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84a.48.48 0 0 0-.48.41l-.36 2.54a7.36 7.36 0 0 0-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.48.48 0 0 0 .12.62l2.03 1.58a7.24 7.24 0 0 0 0 1.88l-2.03 1.58a.49.49 0 0 0-.12.62l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.04.7 1.62.94l.36 2.54c.05.24.25.41.48.41h3.84c.24 0 .44-.17.48-.41l.36-2.54a7.36 7.36 0 0 0 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.62l-2.03-1.58ZM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2Z"/>',
   back: '<path d="M14.5 6l-6 6 6 6"/>',
+  weather: '<path d="M7 18h10a4 4 0 0 0 .6-7.95A5.5 5.5 0 0 0 7 9.5 4.25 4.25 0 0 0 7 18Z"/><path d="M14.5 13.5a2.5 2.5 0 1 1-.7-1.75M14 10.5v1.6h-1.6"/>',
   close: '<path d="M7 7l10 10M17 7 7 17"/>',
   "minimal-digital": '<rect x="2.5" y="6" width="19" height="12" rx="3"/><path d="M7 10v4M10 10v4M14 10v4h3v-4h-3"/>',
   "minimal-analog": '<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/>',
@@ -87,6 +88,10 @@ function itemsFor(level) {
         item("night:" + m, t("radial.night." + m), { icon: "night-" + m, current: s.night === m }))];
     default: {
       const list = [];
+      // "Atualizar clima": no topo quando segurou em cima da temperatura; senão, no fim
+      const wx = s.tempEnabled ? item("weather", t("radial.weather")) : null;
+      const onTemp = menu?.target?.type === "temperature";
+      if (wx && onTemp) list.push(wx);
       if (s.interactive) list.push(item("edit", t(menu?.target ? "radial.editItem" : "radial.editScreen")));
       list.push(
         item("faces", t("radial.faces"), { sub: true }),
@@ -97,6 +102,7 @@ function itemsFor(level) {
         item("rotate", t("radial.rotate")),
         item("settings", t("radial.settings")),
       );
+      if (wx && !onTemp) list.push(wx);
       return list;
     }
   }
@@ -452,7 +458,7 @@ function targetAt(clientX, clientY) {
   const s = hooks.state();
   if (!s.interactive || s.tab !== "clock") return null;
   const el = document.elementsFromPoint(clientX, clientY).find((n) => n.classList?.contains("iel"));
-  return el ? { id: el.dataset.id, label: el.dataset.placeholder || "" } : null;
+  return el ? { id: el.dataset.id, label: el.dataset.placeholder || "", type: el.dataset.type } : null;
 }
 
 function centerTap() {
